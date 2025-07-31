@@ -160,6 +160,12 @@ function cross_section_integral(channel, n_p, n_e, mu_n, mu_p, mu_e, k_nu, cos_t
 end
 
 
+function cross_section_singlepair_wrapper(channel, n_p, n_e, n_B, Y_e, k_nu, cos_theta_nu, B, T; blocking = true, evals = 50000)
+    if n_p > 20 || n_e > 20
+        
+    end
+end
+
 """
     cross_section(channel, n_B, Y_e, k_nu, cos_theta_nu, B, T)
 
@@ -175,7 +181,7 @@ function cross_section(channel, n_B, Y_e, k_nu, cos_theta_nu, B, T; blocking = t
     mu_n = find_zero(mu -> n_n - neutron_density(mu, B, T), (850, 1000))
     mu_p = find_zero(mu -> n_p - proton_density(mu, B, T), (850, 1000))
     mu_e = find_zero(mu -> n_p - electron_density(mu, B, T), (0, 200))
-    println(mu_n, " ", mu_p, " ", mu_e)
+    # println(mu_n, " ", mu_p, " ", mu_e)
     # Maximum Landau level attainable for proton (spin up/down) and electron
     # If spin splitting is disabled, n_max_p_up = n_max_p_down, and we can use
     # either one of them
