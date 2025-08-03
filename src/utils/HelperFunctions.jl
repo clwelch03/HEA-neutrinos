@@ -90,60 +90,60 @@ function electron_density(mu_e, B, T)
 end
 
 
-"""
-    proton_density(mu_p, B, T)
+# """
+#     proton_density(mu_p, B, T)
 
-Calculate the proton number density as a function of chemical potential.
-"""
-function proton_density(mu_p, B, T)
-    if mu_p > PROTON_MASS
-        n_max = round(Int, floor(((mu_p + TEMP_STEPS*T)^2 - PROTON_MASS^2) / (2 * ELEM_CHARGE * (B * GAUSS_TO_MEV2))))
-    else
-        n_max = round(Int, floor((2 * PROTON_MASS * TEMP_STEPS * T) / (2 * ELEM_CHARGE * (B * GAUSS_TO_MEV2))))
-    end
+# Calculate the proton number density as a function of chemical potential.
+# """
+# function proton_density(mu_p, B, T)
+#     if mu_p > PROTON_MASS
+#         n_max = round(Int, floor(((mu_p + TEMP_STEPS*T)^2 - PROTON_MASS^2) / (2 * ELEM_CHARGE * (B * GAUSS_TO_MEV2))))
+#     else
+#         n_max = round(Int, floor((2 * PROTON_MASS * TEMP_STEPS * T) / (2 * ELEM_CHARGE * (B * GAUSS_TO_MEV2))))
+#     end
     
-    result = 0
-    for n_p in 0:n_max+2
-        if mu_p > PROTON_MASS
-            k_z_max_up_sq = (mu_p + TEMP_STEPS*T)^2 - PROTON_MASS^2 - 2*n_p*ELEM_CHARGE * (B * GAUSS_TO_MEV2) + PROTON_G_MINUS_2*ELEM_CHARGE * (B * GAUSS_TO_MEV2)/2
-            k_z_max_down_sq = (mu_p + TEMP_STEPS*T)^2 - PROTON_MASS^2 - 2*n_p*ELEM_CHARGE * (B * GAUSS_TO_MEV2) - PROTON_G_MINUS_2*ELEM_CHARGE * (B * GAUSS_TO_MEV2)/2
-        else
-            k_z_max_up_sq = 2*PROTON_MASS*TEMP_STEPS*T - 2*n_p*ELEM_CHARGE * (B * GAUSS_TO_MEV2) + PROTON_G_MINUS_2*ELEM_CHARGE * (B * GAUSS_TO_MEV2)/2
-            k_z_max_down_sq = 2*PROTON_MASS*TEMP_STEPS*T - 2*n_p*ELEM_CHARGE * (B * GAUSS_TO_MEV2) - PROTON_G_MINUS_2*ELEM_CHARGE * (B * GAUSS_TO_MEV2)/2
-        end
-        k_z_max_up = sqrt(max(0, k_z_max_up_sq))
-        k_z_max_down = sqrt(max(0, k_z_max_down_sq))
+#     result = 0
+#     for n_p in 0:n_max+2
+#         if mu_p > PROTON_MASS
+#             k_z_max_up_sq = (mu_p + TEMP_STEPS*T)^2 - PROTON_MASS^2 - 2*n_p*ELEM_CHARGE * (B * GAUSS_TO_MEV2) + PROTON_G_MINUS_2*ELEM_CHARGE * (B * GAUSS_TO_MEV2)/2
+#             k_z_max_down_sq = (mu_p + TEMP_STEPS*T)^2 - PROTON_MASS^2 - 2*n_p*ELEM_CHARGE * (B * GAUSS_TO_MEV2) - PROTON_G_MINUS_2*ELEM_CHARGE * (B * GAUSS_TO_MEV2)/2
+#         else
+#             k_z_max_up_sq = 2*PROTON_MASS*TEMP_STEPS*T - 2*n_p*ELEM_CHARGE * (B * GAUSS_TO_MEV2) + PROTON_G_MINUS_2*ELEM_CHARGE * (B * GAUSS_TO_MEV2)/2
+#             k_z_max_down_sq = 2*PROTON_MASS*TEMP_STEPS*T - 2*n_p*ELEM_CHARGE * (B * GAUSS_TO_MEV2) - PROTON_G_MINUS_2*ELEM_CHARGE * (B * GAUSS_TO_MEV2)/2
+#         end
+#         k_z_max_up = sqrt(max(0, k_z_max_up_sq))
+#         k_z_max_down = sqrt(max(0, k_z_max_down_sq))
 
-        result += ELEM_CHARGE * (B * GAUSS_TO_MEV2) / (4*pi^2) * quadgk(k_zp -> fermi_dirac(proton_energy(k_zp, n_p, 0.5, B), mu_p, T), -k_z_max_up, k_z_max_up)[1]
-        if n_p > 0
-            result += ELEM_CHARGE * (B * GAUSS_TO_MEV2) / (4*pi^2) * quadgk(k_zp -> fermi_dirac(proton_energy(k_zp, n_p, -0.5, B), mu_p, T), -k_z_max_down, k_z_max_down)[1]
-        end
-    end
-    return result
-end
+#         result += ELEM_CHARGE * (B * GAUSS_TO_MEV2) / (4*pi^2) * quadgk(k_zp -> fermi_dirac(proton_energy(k_zp, n_p, 0.5, B), mu_p, T), -k_z_max_up, k_z_max_up)[1]
+#         if n_p > 0
+#             result += ELEM_CHARGE * (B * GAUSS_TO_MEV2) / (4*pi^2) * quadgk(k_zp -> fermi_dirac(proton_energy(k_zp, n_p, -0.5, B), mu_p, T), -k_z_max_down, k_z_max_down)[1]
+#         end
+#     end
+#     return result
+# end
 
 
-"""
-    neutron_density(mu_n, B, T)
+# """
+#     neutron_density(mu_n, B, T)
 
-Calculate the neutron number density as a function of chemical potential.
-"""
-function neutron_density(mu_n, B, T)
-    if mu_n > NEUTRON_MASS
-        k_max_up_sq = (mu_n + TEMP_STEPS*T + NEUTRON_AMM * (B * GAUSS_TO_MEV2) / 2)^2 - NEUTRON_MASS^2
-        k_max_down_sq = (mu_n + TEMP_STEPS*T - NEUTRON_AMM * (B * GAUSS_TO_MEV2) / 2)^2 - NEUTRON_MASS^2
-    else
-        k_max_up_sq = 2*NEUTRON_MASS * (TEMP_STEPS*T + NEUTRON_AMM * (B * GAUSS_TO_MEV2) / 2)
-        k_max_down_sq = 2*NEUTRON_MASS * (TEMP_STEPS*T - NEUTRON_AMM * (B * GAUSS_TO_MEV2) / 2)
-    end
+# Calculate the neutron number density as a function of chemical potential.
+# """
+# function neutron_density(mu_n, B, T)
+#     if mu_n > NEUTRON_MASS
+#         k_max_up_sq = (mu_n + TEMP_STEPS*T + NEUTRON_AMM * (B * GAUSS_TO_MEV2) / 2)^2 - NEUTRON_MASS^2
+#         k_max_down_sq = (mu_n + TEMP_STEPS*T - NEUTRON_AMM * (B * GAUSS_TO_MEV2) / 2)^2 - NEUTRON_MASS^2
+#     else
+#         k_max_up_sq = 2*NEUTRON_MASS * (TEMP_STEPS*T + NEUTRON_AMM * (B * GAUSS_TO_MEV2) / 2)
+#         k_max_down_sq = 2*NEUTRON_MASS * (TEMP_STEPS*T - NEUTRON_AMM * (B * GAUSS_TO_MEV2) / 2)
+#     end
     
-    k_max_up = sqrt(max(0, k_max_up_sq))
-    k_max_down = sqrt(max(0, k_max_down_sq))
+#     k_max_up = sqrt(max(0, k_max_up_sq))
+#     k_max_down = sqrt(max(0, k_max_down_sq))
 
-    result = 1 / (2*pi^2) * quadgk(k_n -> k_n^2 * fermi_dirac(sqrt(k_n^2 + NEUTRON_MASS^2) + NEUTRON_AMM * (B * GAUSS_TO_MEV2) / 2, mu_n, T), 0, k_max_up)[1]
-    result += 1 / (2*pi^2) * quadgk(k_n -> k_n^2 * fermi_dirac(sqrt(k_n^2 + NEUTRON_MASS^2) - NEUTRON_AMM * (B * GAUSS_TO_MEV2) / 2, mu_n, T), 0, k_max_down)[1]
+#     result = 1 / (2*pi^2) * quadgk(k_n -> k_n^2 * fermi_dirac(sqrt(k_n^2 + NEUTRON_MASS^2) + NEUTRON_AMM * (B * GAUSS_TO_MEV2) / 2, mu_n, T), 0, k_max_up)[1]
+#     result += 1 / (2*pi^2) * quadgk(k_n -> k_n^2 * fermi_dirac(sqrt(k_n^2 + NEUTRON_MASS^2) - NEUTRON_AMM * (B * GAUSS_TO_MEV2) / 2, mu_n, T), 0, k_max_down)[1]
 
-    return result
-end
+#     return result
+# end
 
 end # module HelperFunctions
