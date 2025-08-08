@@ -15,24 +15,24 @@ struct WeakFieldOrLowTemperature <: Regime end
 struct ZeroField <: Regime end
 struct Unspecified <: Regime end
 
-
-# this code is dogshit
-# i'll make it better Later tm
 electron_energy(electron_momentum_z, electron_level, magnetic_field) = sqrt(ELECTRON_MASS^2 + electron_momentum_z^2 + 2 * electron_level * magnetic_field)
 
 """
-    electron_density(electron_chemical_potential, B, T)
+    electron_density(electron_chemical_potential, magnetic_field, temperature)
 
 Calculate the electron number density as a function of chemical potential.
 """
+
 function electron_density(electron_chemical_potential, magnetic_field, temperature)
     mue_gtr_me = electron_chemical_potential > ELECTRON_MASS
-    n_max = round(Int, floor(((mue_gtr_me*electron_chemical_potential + TEMP_STEPS*temperature)^2 - ELECTRON_MASS^2) /
-                (2 * magnetic_field)))
-    result = 0
-    for n_e in 0:n_max+1
+    energy_term = electron_chemical_potential*mue_gtr_me + TEMP_STEPS*temperature
+    max_energy_level = floor(Int, (energy_term^2 - ELECTRON_MASS^2) / (2 * magnetic_field))
+    
+    result = 0.0
+    for n_e in 0:max_energy_level
         k_z_max = sqrt(max(0, (mue_gtr_me*electron_chemical_potential + TEMP_STEPS*temperature)^2 - ELECTRON_MASS^2 - 2 * n_e * magnetic_field))
-        level_contrib = magnetic_field / (4*pi^2) * quadgk(k_ze -> fermi_dirac(electron_energy(k_ze, n_e, magnetic_field), electron_chemical_potential, temperature), -k_z_max, k_z_max; rtol=1e-4)[1]
+        level_contrib = magnetic_field / (4*pi^2) * quadgk(k_ze ->fermi_dirac(electron_energy(k_ze, n_e, magnetic_field),
+                                                            electron_chemical_potential, temperature), -k_z_max, k_z_max; rtol=1e-4)[1]
         if n_e > 0
             level_contrib *= 2
         end
@@ -41,14 +41,31 @@ function electron_density(electron_chemical_potential, magnetic_field, temperatu
     return result
 end
 
+# function electron_density(electron_chemical_potential, magnetic_field, temperature)
+#     mue_gtr_me = electron_chemical_potential > ELECTRON_MASS
+
+#     n_max = round(Int, floor(((mue_gtr_me*electron_chemical_potential + TEMP_STEPS*temperature)^2 - ELECTRON_MASS^2) /
+#                 (2 * magnetic_field)))
+#     result = 0
+#     for n_e in 0:n_max+1
+#         k_z_max = sqrt(max(0, (mue_gtr_me*electron_chemical_potential + TEMP_STEPS*temperature)^2 - ELECTRON_MASS^2 - 2 * n_e * magnetic_field))
+#         level_contrib = magnetic_field / (4*pi^2) * quadgk(k_ze -> fermi_dirac(electron_energy(k_ze, n_e, magnetic_field), electron_chemical_potential, temperature), -k_z_max, k_z_max; rtol=1e-4)[1]
+#         if n_e > 0
+#             level_contrib *= 2
+#         end
+#         result += level_contrib
+#     end
+#     return result
+# end
+
 """
     fermi_dirac(E, mu, T)
 
 Calculate the Fermi-Dirac distribution for a given ``E, mu, T``.
 """
 function fermi_dirac(energy, chemical_potential, temperature)
-    if (energy-chemical_potential)/temperature > 20 return 0 end;
-    if (energy-chemical_potential)/temperature < -20 return 1 end;
+    if (energy-chemical_potential)/temperature > 15 return 0 end;
+    if (energy-chemical_potential)/temperature < -15 return 1 end;
     return 1 / (1 + exp((energy - chemical_potential) / temperature))
 end
 
@@ -266,7 +283,7 @@ function set_regime_if_unspecified(regime::Regime, magnetic_field, temperature, 
 end
 
 # opacity('n', (197.3^3 * 0.16 * 0.001), 0.25, 10, pi/2, ELEM_CHARGE*GAUSS_TO_MEV2*1e17, 3)
-println(opacity(NeutronChannel(), (197.3^3 * 0.16 * 0.001), 0.25, 10, pi/2, ELEM_CHARGE*GAUSS_TO_MEV2*1e17, 3; regime=StrongField()))
+println(opacity(NeutronChannel(), (197.3^3 * 0.16 * 0.001), 0.25, 10, pi/2, ELEM_CHARGE*GAUSS_TO_MEV2*1e16, 3; regime=StrongField()))
 println(opacity(NeutronChannel(), (197.3^3 * 0.16 * 0.001), 0.25, 10, pi/2, ELEM_CHARGE*GAUSS_TO_MEV2*1e17, 3; regime=MediumField()))
 println(opacity(NeutronChannel(), (197.3^3 * 0.16 * 0.001), 0.25, 10, pi/2, ELEM_CHARGE*GAUSS_TO_MEV2*1e17, 3; regime=WeakFieldOrLowTemperature()))
 println(opacity(ProtonChannel(), (197.3^3 * 0.16 * 0.001), 0.25, 10, pi/2, ELEM_CHARGE*GAUSS_TO_MEV2*1e17, 3; regime=StrongField()))
@@ -276,6 +293,6 @@ println(opacity(ProtonChannel(), (197.3^3 * 0.16 * 0.001), 0.25, 10, pi/2, ELEM_
 # @btime opacity(NeutronChannel(), (197.3^3 * 0.16 * 0.001), 0.25, 10, pi/2, ELEM_CHARGE*GAUSS_TO_MEV2*1e17, 3)
 # println(opacity('p', (197.3^3 * 0.16 * 0.001), 0.25, 10, pi/2, ELEM_CHARGE*GAUSS_TO_MEV2*1e17, 1))
 
-@btime opacity(NeutronChannel(), (197.3^3 * 0.16 * 0.001), 0.25, 10, pi/2, ELEM_CHARGE*GAUSS_TO_MEV2*1e17, 3; regime=StrongField())
+# @btime opacity(NeutronChannel(), (197.3^3 * 0.16 * 0.001), 0.25, 10, pi/2, ELEM_CHARGE*GAUSS_TO_MEV2*1e17, 3; regime=StrongField())
 
 end # module Opacity
