@@ -1,5 +1,7 @@
 module Opacity
 export opacity
+export ProtonChannel, NeutronChannel
+export StrongField, MediumField, WeakFieldOrLowTemperature, ZeroField, Unspecified
 
 include("./utils/Constants.jl")
 using Roots, QuadGK, BenchmarkTools
@@ -17,13 +19,13 @@ struct Unspecified <: Regime end
 
 electron_energy(electron_momentum_z, electron_level, magnetic_field) = sqrt(ELECTRON_MASS^2 + electron_momentum_z^2 + 2 * electron_level * magnetic_field)
 
+
 """
-    electron_density(electron_chemical_potential, magnetic_field, temperature)
+    electron_density_nonzero_field(electron_chemical_potential, magnetic_field, temperature)
 
 Calculate the electron number density as a function of chemical potential.
 """
-
-function electron_density(electron_chemical_potential, magnetic_field, temperature)
+function electron_density_nonzero_field(electron_chemical_potential, magnetic_field, temperature)
     mue_gtr_me = electron_chemical_potential > ELECTRON_MASS
     energy_term = electron_chemical_potential*mue_gtr_me + TEMP_STEPS*temperature
     max_energy_level = floor(Int, (energy_term^2 - ELECTRON_MASS^2) / (2 * magnetic_field))
@@ -31,7 +33,7 @@ function electron_density(electron_chemical_potential, magnetic_field, temperatu
     result = 0.0
     for n_e in 0:max_energy_level
         k_z_max = sqrt(max(0, (mue_gtr_me*electron_chemical_potential + TEMP_STEPS*temperature)^2 - ELECTRON_MASS^2 - 2 * n_e * magnetic_field))
-        level_contrib = magnetic_field / (4*pi^2) * quadgk(k_ze ->fermi_dirac(electron_energy(k_ze, n_e, magnetic_field),
+        level_contrib = magnetic_field / (4*pi^2) * quadgk(k_ze -> fermi_dirac(electron_energy(k_ze, n_e, magnetic_field),
                                                             electron_chemical_potential, temperature), -k_z_max, k_z_max; rtol=1e-4)[1]
         if n_e > 0
             level_contrib *= 2
@@ -40,6 +42,29 @@ function electron_density(electron_chemical_potential, magnetic_field, temperatu
     end
     return result
 end
+
+
+"""
+    electron_density_zero_field(electron_chemical_potential, temperature)
+
+Calculate the electron number density as a function of chemical potential, in the zero-field case.
+"""
+function electron_density_zero_field(electron_chemical_potential, temperature)
+    upper_bound = max(20 * temperature, 20 * (temperature + electron_chemical_potential))
+    return quadgk(k -> k^2 / (pi^2 * (exp((k - electron_chemical_potential) / temperature) + 1)), 0, upper_bound)[1]
+end
+
+
+"""
+    find_electron_chemical_potential
+
+Calculate the electron's chemical potential.
+"""
+find_electron_chemical_potential(::Union{StrongField, MediumField, WeakFieldOrLowTemperature}, proton_density, magnetic_field, temperature) =
+    find_zero(mu -> proton_density - electron_density_nonzero_field(mu, magnetic_field, temperature), 5)
+
+find_electron_chemical_potential(::ZeroField, proton_density, magnetic_field, temperature) = 
+    find_zero(mu -> proton_density - electron_density_zero_field(mu, temperature), 20)
 
 # function electron_density(electron_chemical_potential, magnetic_field, temperature)
 #     mue_gtr_me = electron_chemical_potential > ELECTRON_MASS
@@ -119,6 +144,7 @@ function get_shifted_energy(channel, neutrino_energy, neutron_spin, proton_spin,
     neutrino_energy + energy_shift
 end
 
+
 # Blocking Terms
 """
     function blocking_term
@@ -138,7 +164,7 @@ function blocking_term(::NeutronChannel, ::StrongField, _, proton_density, _, pr
     term_4 = exp(-neutrino_momentum_perp^2 / (2 * magnetic_field + 2 * M_times_T) * 
                             (magnetic_field * (1 - recurring_exponential) / (magnetic_field + M_times_T * recurring_exponential)) - 
                             neutrino_momentum_z^2 / (4 * M_times_T))
-    1 - term_1 * term_2 * term_3 * term_4
+    return 1 - term_1 * term_2 * term_3 * term_4
 end
 
 ## Neutron, medium field
@@ -147,7 +173,7 @@ function blocking_term(::NeutronChannel, ::MediumField, _, proton_density, _, pr
                                         cosh((PROTON_GYROMAGNETIC_RATIO * magnetic_field) / (4 * M_times_T))
     term_2 = (pi / M_times_T)^(3/2) * sinh(magnetic_field / (2 * M_times_T)) * M_times_T / magnetic_field
     term_3 = exp(-neutrino_energy^2 / (4 * M_times_T))
-    1 - term_1 * term_2 * term_3
+    return 1 - term_1 * term_2 * term_3
 end
 
 ## Neutron, weak field/low temp
@@ -155,8 +181,17 @@ function blocking_term(::NeutronChannel, ::WeakFieldOrLowTemperature, _, proton_
     term_1 = proton_density * exp((PROTON_GYROMAGNETIC_RATIO * proton_spin * magnetic_field) / (2 * M_times_T)) /
                                         (2 * cosh((PROTON_GYROMAGNETIC_RATIO * magnetic_field) / (4 * M_times_T)))
     term_2 = (pi / M_times_T)^(3/2) * exp(-neutrino_energy^2 / (4 * M_times_T))
-    1 - term_1 * term_2
+    return 1 - term_1 * term_2
 end
+
+
+## Neutron, zero field
+function blocking_term(::NeutronChannel, ::ZeroField, _, proton_density, _, proton_spin, neutrino_energy, neutrino_angle, magnetic_field, M_times_T)
+    term_1 = (proton_density / 2) * (pi / M_times_T)^(3/2)
+    term_2 = exp(-neutrino_energy^2 / (4 * M_times_T))
+    return 1 - term_1 * term_2
+end
+
 
 ## Proton, strong field
 function blocking_term(::ProtonChannel, ::StrongField, neutron_density, _, neutron_spin, _, neutrino_energy, neutrino_angle, magnetic_field, M_times_T)
@@ -171,16 +206,26 @@ function blocking_term(::ProtonChannel, ::StrongField, neutron_density, _, neutr
     term_4 = exp(-neutrino_momentum_perp^2 / 2 * 
                     (recurring_exponential / (magnetic_field + M_times_T * recurring_exponential)) - 
                     neutrino_momentum_z^2 / (4 * M_times_T))
-    term_1 - term_2 * term_3 * term_4
+    return term_1 - term_2 * term_3 * term_4
 end
+
 
 ## Proton, medium field/weak field/low temp
 function blocking_term(::ProtonChannel, ::Union{MediumField, WeakFieldOrLowTemperature}, neutron_density, _, neutron_spin, _, neutrino_energy, neutrino_angle, magnetic_field, M_times_T)
     term_1 = neutron_density * exp((NEUTRON_GYROMAGNETIC_RATIO * neutron_spin * magnetic_field) / (2 * M_times_T)) /
                                         (2 * cosh((NEUTRON_GYROMAGNETIC_RATIO * magnetic_field) / (4 * M_times_T)))
     term_2 = (pi / M_times_T)^(3/2) * exp(-neutrino_energy^2 / (4 * M_times_T))
-    1 - term_1 * term_2
+    return 1 - term_1 * term_2
 end
+
+
+## Proton, zero field
+function blocking_term(::ProtonChannel, ::ZeroField, neutron_density, _, neutron_spin, _, neutrino_energy, neutrino_angle, magnetic_field, M_times_T)
+    term_1 = (neutron_density / 2) * (pi / M_times_T)^(3/2)
+    term_2 = exp(-neutrino_energy^2 / (4 * M_times_T))
+    return 1 - term_1 * term_2
+end
+
 
 
 """
@@ -196,6 +241,7 @@ function get_v_tilde_and_n_e_flag(::MediumField, shifted_neutrino_energy, magnet
     return v_tilde, n_e_equals_0
 end
 get_v_tilde_and_n_e_flag(::WeakFieldOrLowTemperature, shifted_neutrino_energy, magnetic_field) = shifted_neutrino_energy^2 / magnetic_field, false
+get_v_tilde_and_n_e_flag(::ZeroField, shifted_neutrino_energy, magnetic_field) = 1, false
 
 # Exponential terms #
 get_exponential_term(::NeutronChannel, neutron_spin, proton_spin, magnetic_field, M_times_T) = exp((NEUTRON_GYROMAGNETIC_RATIO * neutron_spin * magnetic_field) / (2 * M_times_T))
@@ -207,8 +253,11 @@ get_prefactor(::NeutronChannel, G_tilde, neutron_density, _, _magnetic_field, _M
 get_prefactor(::ProtonChannel, G_tilde, _, proton_density, magnetic_field, M_times_T) =
     G_tilde * proton_density * sinh(magnetic_field / (2 * M_times_T)) * M_times_T / magnetic_field
 
+
 """
     function opacity(channel, baryon_density, proton_fraction, neutrino_energy, neutrino_angle, magnetic_field, temperature; regime=Unspecified())
+
+Calculate the opacity of the capture process in question.
 """
 function opacity(channel, baryon_density, proton_fraction, neutrino_energy, neutrino_angle, magnetic_field, temperature; regime=Unspecified())
     # Fermi-Dirac regime not yet implemented
@@ -230,7 +279,7 @@ function opacity(channel, baryon_density, proton_fraction, neutrino_energy, neut
     regime = set_regime_if_unspecified(regime, magnetic_field, temperature, neutrino_energy)
 
     # Calculate the electron's chemical potential
-    electron_chemical_potential = find_zero(mu -> proton_density - electron_density(mu, magnetic_field, temperature), 5)
+    electron_chemical_potential = find_electron_chemical_potential(regime, proton_density, magnetic_field, temperature)
     
     # Sum over nucleon spins
     sum_over_spins = 0.0
@@ -270,28 +319,26 @@ function set_regime_if_unspecified(regime::Regime, magnetic_field, temperature, 
     if !(regime isa Unspecified)
         return regime
     elseif strong_field_condition(magnetic_field, temperature)
-        return Regime::StrongField()
+        return StrongField()
     elseif medium_field_condition(magnetic_field, temperature)
-        return Regime::MediumField()
+        return MediumField()
     elseif weak_field_condition(magnetic_field, temperature, neutrino_energy) || low_temperature_condition(magnetic_field, temperature, neutrino_energy)
-        return Regime::WeakFieldOrLowTemperature()
+        return WeakFieldOrLowTemperature()
     elseif zero_field_condition(magnetic_field)
-        return Regime::ZeroField()
+        return ZeroField()
     else
         error("Could not determine parameter-space regime for eB=$magnetic_field MeV^2, T=$temperature MeV, E_nu=$neutrino_energy MeV")
     end
 end
 
-# opacity('n', (197.3^3 * 0.16 * 0.001), 0.25, 10, pi/2, ELEM_CHARGE*GAUSS_TO_MEV2*1e17, 3)
-println(opacity(NeutronChannel(), (197.3^3 * 0.16 * 0.001), 0.25, 10, pi/2, ELEM_CHARGE*GAUSS_TO_MEV2*1e16, 3; regime=StrongField()))
-println(opacity(NeutronChannel(), (197.3^3 * 0.16 * 0.001), 0.25, 10, pi/2, ELEM_CHARGE*GAUSS_TO_MEV2*1e17, 3; regime=MediumField()))
-println(opacity(NeutronChannel(), (197.3^3 * 0.16 * 0.001), 0.25, 10, pi/2, ELEM_CHARGE*GAUSS_TO_MEV2*1e17, 3; regime=WeakFieldOrLowTemperature()))
-println(opacity(ProtonChannel(), (197.3^3 * 0.16 * 0.001), 0.25, 10, pi/2, ELEM_CHARGE*GAUSS_TO_MEV2*1e17, 3; regime=StrongField()))
-println(opacity(ProtonChannel(), (197.3^3 * 0.16 * 0.001), 0.25, 10, pi/2, ELEM_CHARGE*GAUSS_TO_MEV2*1e17, 3; regime=MediumField()))
-println(opacity(ProtonChannel(), (197.3^3 * 0.16 * 0.001), 0.25, 10, pi/2, ELEM_CHARGE*GAUSS_TO_MEV2*1e17, 3; regime=WeakFieldOrLowTemperature()))
-
-# @btime opacity(NeutronChannel(), (197.3^3 * 0.16 * 0.001), 0.25, 10, pi/2, ELEM_CHARGE*GAUSS_TO_MEV2*1e17, 3)
-# println(opacity('p', (197.3^3 * 0.16 * 0.001), 0.25, 10, pi/2, ELEM_CHARGE*GAUSS_TO_MEV2*1e17, 1))
+# println(opacity(NeutronChannel(), (197.3^3 * 0.16 * 0.001), 0.25, 10, pi/2, ELEM_CHARGE*GAUSS_TO_MEV2*1e17, 3; regime=StrongField()))
+# println(opacity(NeutronChannel(), (197.3^3 * 0.16 * 0.001), 0.25, 10, pi/2, ELEM_CHARGE*GAUSS_TO_MEV2*1e17, 3; regime=MediumField()))
+# println(opacity(NeutronChannel(), (197.3^3 * 0.16 * 0.001), 0.25, 10, pi/2, ELEM_CHARGE*GAUSS_TO_MEV2*1e17, 3; regime=WeakFieldOrLowTemperature()))
+# println(opacity(NeutronChannel(), (197.3^3 * 0.16 * 0.001), 0.25, 10, pi/2, ELEM_CHARGE*GAUSS_TO_MEV2*1e17, 3; regime=ZeroField()))
+# println(opacity(ProtonChannel(), (197.3^3 * 0.16 * 0.001), 0.25, 10, pi/2, ELEM_CHARGE*GAUSS_TO_MEV2*1e17, 3; regime=StrongField()))
+# println(opacity(ProtonChannel(), (197.3^3 * 0.16 * 0.001), 0.25, 10, pi/2, ELEM_CHARGE*GAUSS_TO_MEV2*1e17, 3; regime=MediumField()))
+# println(opacity(ProtonChannel(), (197.3^3 * 0.16 * 0.001), 0.25, 10, pi/2, ELEM_CHARGE*GAUSS_TO_MEV2*1e17, 3; regime=WeakFieldOrLowTemperature()))
+# println(opacity(ProtonChannel(), (197.3^3 * 0.16 * 0.001), 0.25, 10, pi/2, ELEM_CHARGE*GAUSS_TO_MEV2*1e17, 3; regime=ZeroField()))
 
 # @btime opacity(NeutronChannel(), (197.3^3 * 0.16 * 0.001), 0.25, 10, pi/2, ELEM_CHARGE*GAUSS_TO_MEV2*1e17, 3; regime=StrongField())
 
