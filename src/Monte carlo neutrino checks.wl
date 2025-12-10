@@ -495,6 +495,7 @@ numsamples = Min[{Max[{Ceiling[10 * (cond[[icond]][[1]] / (20 / HBARC))^3 / (con
 For[counter = 0, counter < 10, counter++, AppendTo[params, {cond[[icond]][[4]], cond[[icond]][[1]], mulist[[icond]][[1]], mulist[[icond]][[2]], mulist[[icond]][[3]], nus[[inu]][[1]], nus[[inu]][[2]], nus[[inu]][[3]], numsamples}]]]];
 resultsn = {};
 resultsp = {};
+CloseKernels[];
 LaunchKernels[numkern];
 Print["Starting neutron opacity"];
 temp = Parallelize[Map[kappanmc, params]];
@@ -533,7 +534,7 @@ paramsdp = {};
 paramsp = {};
 paramse = {};
 For[inu = 1, inu < numnu + 1, inu++, For[icond = 1, icond < numcond + 1, icond++,
-nump = Min[{Max[{20, Ceiling[10 * ((cond[[icond]][[1]] + nus[[inu]][[1]]) / (20 / HBARC))^2 / (cond[[icond]][[4]] / (100 * G15TOFM))^2]}], 60}];
+nump = Min[{Max[{10, Ceiling[10 * ((cond[[icond]][[1]] + nus[[inu]][[1]]) / (20 / HBARC))^2 / (cond[[icond]][[4]] / (100 * G15TOFM))^2]}], 30}];
 Print[nump];
 For[counter = 0, counter < 10, counter++, AppendTo[paramsdn, {cond[[icond]][[4]], cond[[icond]][[1]], mulist[[icond]][[2]], nus[[inu]][[1]], nus[[inu]][[2]], nus[[inu]][[3]], nus[[inu]][[4]], nus[[inu]][[5]]}]];
 For[counter = 0, counter < 10, counter++, AppendTo[paramsn, {cond[[icond]][[4]], cond[[icond]][[1]], mulist[[icond]][[2]], nus[[inu]][[1]], nus[[inu]][[2]]}]];
@@ -546,6 +547,7 @@ resultsn = {};
 resultsdp = {};
 resultsp = {};
 resultse = {};
+CloseKernels[];
 LaunchKernels[numkern];
 Print["Starting proton opacity"];
 AppendTo[resultsp, Parallelize[Map[kappapmcnc, paramsp]]];
