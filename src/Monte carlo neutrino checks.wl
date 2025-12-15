@@ -294,13 +294,13 @@ sumpref * (1 - n * Sinh[eb / (2 * mt)] / Cosh[GP * eb / (4 * mt)] * (2 * Pi)^(3/
 prefactor * spinsum];
 
 jfunc[knu_, mue_, t_, hc_, eb_]:=Module[{kbar, mubar, tbar, ifunc},
-kbar = knu * Sqrt[(1 + hc) / eb];
-mubar = mue * Sqrt[(1 + hc) / eb];
-tbar = t * Sqrt[(1 + hc) / eb];
+kbar = knu / Sqrt[eb];
+mubar = mue / Sqrt[eb];
+tbar = t / Sqrt[eb];
 ifunc[qbar_]:= If[qbar > 0, Log[(1 + Exp[mubar / tbar]) / (1 + Exp[(mubar - qbar) / tbar])],
 	Log[(1 + Exp[(mubar + 2 * qbar) / tbar]) / (1 + Exp[(mubar + qbar) / tbar])]] / (Exp[qbar / tbar] - 1);
-NIntegrate[kbar * (1 - hc) * Exp[-qbar * kbar] * BesselI[0, kbar^2 * (1 - hc) * Sqrt[1 + 2 * qbar / (kbar * (1 - hc))]]
-	* ifunc[qbar], {qbar, - kbar * (1 - hc) / 2, Infinity}]
+NIntegrate[kperp * (1 - hc) * Exp[-kperp^2 / 2] * BesselI[0, kperp * kbar * Sqrt[1 - hc^2]]
+	* ifunc[(kperp^2 - kbar^2 * (1 - hc^2)) / (2 * kbar * (1 - hc))], {kperp, 0, Infinity}]
 ];
 
 kappaenc[eb_, t_, mue_, knu_, cost_, ise_]:=Module[{prefactor, rest, h, sgn},
