@@ -293,14 +293,14 @@ sumpref * (1 - n * Sinh[eb / (2 * mt)] / Cosh[GP * eb / (4 * mt)] * (2 * Pi)^(3/
 / (eb * Sqrt[mt]) * Exp[(GP - 2) * spr * eb / (4 * mt)]), {s, {-1, 1}}, {spr, {-1, 1}}];
 prefactor * spinsum];
 
-jfunc[knu_, mue_, t_, hc_, eb_]:=Module[{kbar, mubar, tbar, ifunc},
+jfunc[knu_, mue_, t_, hc_, eb_]:=Module[{kbar, mubar, tbar, ifunc, q0},
 kbar = knu / Sqrt[eb];
 mubar = mue / Sqrt[eb];
 tbar = t / Sqrt[eb];
 ifunc[qbar_]:= If[qbar > 0, Log[(1 + Exp[mubar / tbar]) / (1 + Exp[(mubar - qbar) / tbar])],
 	Log[(1 + Exp[(mubar + 2 * qbar) / tbar]) / (1 + Exp[(mubar + qbar) / tbar])]] / (Exp[qbar / tbar] - 1);
-NIntegrate[kperp * (1 - hc) * Exp[-kperp^2 / 2] * BesselI[0, kperp * kbar * Sqrt[1 - hc^2]]
-	* ifunc[(kperp^2 - kbar^2 * (1 - hc^2)) / (2 * kbar * (1 - hc))], {kperp, 0, Infinity}]
+NIntegrate[q0 = (kperp^2 - kbar^2 * (1 - hc^2)) / (2 * kbar * (1 + hc)); kperp * (1 - hc) * (1 - (hc * kbar - q0) / Sqrt[kperp^2 + (hc * kbar - q0)^2])
+	* Exp[-kperp^2 / 2] * BesselI[0, kperp * kbar * Sqrt[1 - hc^2]] * ifunc[q0], {kperp, 0, 10 * (kbar + tbar)}]
 ];
 
 kappaenc[eb_, t_, mue_, knu_, cost_, ise_]:=Module[{prefactor, rest, h, sgn},
