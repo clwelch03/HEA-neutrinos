@@ -16,10 +16,10 @@ SINTW = Sqrt[0.231]; (*Weinberg angle*)
 HBARC = 197.3269718; (*all calculations will be done in fm*)
 NUCMASS = 2 * 939.5653 * 938.272 / (939.5653 + 938.272) / HBARC; (*average nucleon mass*)
 MSPLIT = (939.5653 - 938.272) / HBARC; (* nucleon mass splitting *)
-ELECMASS = 0.511 / HBARC;
+ELECMASS = 0.511 / HBARC; (* electron mass, only for use in kinematics *)
 GA = 1.27; (*no g-t discrepancy for electroweak*)
-G15TOFM = 19.5 * Sqrt[4 * Pi / 137] / HBARC^2; (*convention that alpha = e^2/4pi*)
-GP = 5.5858; GN = -3.8263; (*for anomalous magnetic moments, note that GE=2.002 so the g-2 is negligible for leptons*)
+G15TOFM = 19.5 * Sqrt[4 * Pi / 137] / HBARC^2; (*convert B in 10^15 G to eB in fm^2 with the convention that alpha = e^2/4pi*)
+GP = 5.5858; GN = -3.8263; (*gyromagnetic ratios for nucleons, note that GE=2.002 so the g-2 is negligible for leptons*)
 
 (* functions for getting chemical potentials and distributions *)
 nfd[e_, mu_, t_]:= 1 / (Exp[(e - mu) / t] + 1);(*If[(e - mu) / t > 50, 0, If[(e - mu) / t < -50, 1, 1 / (Exp[(e - mu) / t] + 1)]]*)
@@ -33,6 +33,7 @@ mupofn[n_, eb_, t_]:= If[NUCMASS * t / eb > 100, FindRoot[-n + NIntegrate[k^2 / 
 	FindRoot[-n + NIntegrate[eb / (4 * Pi^2) * nfd[k^2 / (2 * NUCMASS) - (GP - 2) * eb / (4 * NUCMASS), mu, t] 
 	+ Sum[eb / (4 * Pi^2) * (nfd[k^2 / (2 * NUCMASS) + np * eb / NUCMASS + (GP - 2) * eb / (4 * NUCMASS), mu, t] + nfd[k^2 / (2 * NUCMASS) + np * eb / NUCMASS - (GP - 2) * eb / (4 * NUCMASS), mu, t]), 
 	{np, 1, Ceiling[NUCMASS * t * 5 / eb]}], {k, -Infinity, Infinity}], {mu, t}]];
+(*lepton kinematics for cc interactions*)
 thetapm[x_, sp_, sn_, eb_, ui_, pm_]:=HeavisideTheta[MSPLIT + pm * ELECMASS + ui - eb / (4 * NUCMASS) * (GN * sn - (GP - 2) * sp) - x];
 e0pm[knu_, sp_, sn_, eb_, ui_, pm_]:= Module[{delta},
 delta = MSPLIT + ui - eb / (4 * NUCMASS) * (GN * sn - (GP - 2) * sp);
@@ -54,7 +55,7 @@ knut = knu / Sqrt[2 * mt];
 (2 * mt)^(3 / 2) / (2 * Pi)^2 * (f1[kfnt, u] + w * g1[kfnt, u] + knut^2 * ((f1[kfnt, u] + w * g1[kfnt, u]) * (u + cost^2 - u * cost^2)
 	+ (f2[kfnt, u] + w * g2[kfnt, u]) * (u^2 * cost^2 - u^2) + (f3[kfnt, u] + w * g3[kfnt, u]) * (u^2 + 2 * cost^2 + u^2 * cost^2)))];
 
-(*functions for elastic scattering kernels*)
+(*functions for nc scattering kernels*)
 ffunc[q0_,qz_, qp_, temp_, eb_, s_, spr_]:= Module[{t, q, qpt, expterm, prefactor, sfunc, sarg},
 q = Sqrt[qz^2 + qp^2];
 t = Exp[-eb / (NUCMASS * temp)];
@@ -79,12 +80,14 @@ neutkern[mun_, t_, q0_, q_]:= If[q0 == 0, 0, If[q0 > 0, NUCMASS^2 * t / (2 * Pi 
 	
 eleckern[mue_, eb_, t_, q0_, q_, cosq_]:= If[q0 <= q, 0, eb / (2 * Pi) * t * Exp[-q^2 * (1 - cosq^2) / (2 * eb)] * (Log[1 + Exp[mue / t]] - Log[1 + Exp[(mue - q0) / t]]) / (Exp[q0 / t] - 1)];
 
+(*pretty sure these aren't used anymore -MLK 12-17-25 *)
 alpha[delta_, knu_]:=If[delta > 0, 4 * knu^2 + 12 * knu * delta + 6 * delta^2, If[-knu < delta, 4 * (knu + delta)^3 / knu, 0]];
 beta[delta_, knu_]:= If[delta > 0, knu^2 + 4 * knu * delta, If[-knu < delta, (knu + delta)^4 / knu^2, 0]];
 asspr[s_, spr_, cost_]:=If[s == spr, 1 / 2 * (1 + GA^2 + 2 * GA * s * (1 - 4 * SINTW^2) * cost), GA^2];
 bsspr[s_, spr_, cost_]:=If[s == spr, 1 / 2 * (1 - GA^2 + 2 * GA^2 * cost + 2 * GA * s * (1 - 4 * SINTW^2) * cost), GA^2 * (-1 + 2 * cost)];
 
 (*Matrix elements for charged current*)
+(*note these do not match the normalization convention in the paper but that factor is cancelled in the final kappa expression*)
 mredcc[sp_, sn_, nezero_, cost_]:=If[nezero, If[sn == 1, If[sp == 1, 4 * (1 + GA)^2 * (1 + cost), 0], If[sp == 1, 16 * GA^2 * (1 - cost), 4 * (1 - GA)^2 * (1 + cost)]],
 	If[sn == 1, If[sp == 1, 2 * (1 + GA)^2 * (1 + cost) + 2 * (1 - GA)^2 * (1 - cost), 8 * GA^2 * (1 + cost)], If[sp == 1, 8 * GA^2 * (1 - cost),
 	2 * (1 + GA)^2 * (1 - cost) + 2 * (1 - GA)^2 * (1 + cost)]]];
@@ -110,14 +113,17 @@ u = knu^2 / (2 * mt);
 iu = Coth[u] - 1 / u;
 1 / (4 * u) * (1 - Exp[-u]) * If[s == spr, (1 - iu + GA^2 * (1 + (2 * cost^2 - 1) * iu)) - 2 * GA * s * cost * (1 + iu),
 	GA^2 * (2 - 2 * cost * iu)]];
-	
+
+(* mrednce is for electron type neutrinos, mredncex is for muon and tau neutrinos *)	
 mrednce[h_, hpr_, cost_, costpr_]:=If[h != hpr, 0, If[h == 1, 4 * SINTW^4 * (1 - cost) * (1 - costpr), (1 + 2 * SINTW^2)^2 * (1 + cost) * (1 + costpr)]];
 mredncex[h_, hpr_, cost_, costpr_]:=If[h != hpr, 0, If[h == 1, 4 * SINTW^4 * (1 - cost) * (1 - costpr), (1 - 2 * SINTW^2)^2 * (1 + cost) * (1 + costpr)]];
 
+(*just the helicity weights for electron scattering since 1-hc can be absorbed into the kinematics*)
 mredncestrip[h_, hpr_]:=If[h != hpr, 0, If[h == 1, 4 * SINTW^4, (1 + 2 * SINTW^2)^2]];
 mredncexstrip[h_, hpr_]:=If[h != hpr, 0, If[h == 1, 4 * SINTW^4, (1 - 2 * SINTW^2)^2]];
 
 (*Opacities - analytical approx*)
+(*neutron charged current - nondegenerate*)
 kappan[eb_, t_, mue_, nb_, yp_, knu_, cost_, ui_]:= Module[{kperp, kz, prefactor, mt, ebmt, spinsum, sp, sn, pdenom},
 kz = knu * cost;
 kperp = knu * Sqrt[1 - cost^2];
@@ -130,6 +136,7 @@ spinsum = Sum[Sum[(1 - nfd[e0pm[knu, sp, sn, eb, ui, 1], mue, t]) * thetapm[-knu
 	 * Exp[-kperp^2 / (2 * mt) * (1 - Exp[-ebmt]) / (ebmt + 1 - Exp[-ebmt]) - (kz^2 + e0pm[knu, sp, sn, eb, ui, 1]^2)/(4*mt)]), {sp, {-1, 1}}], {sn, {-1, 1}}];
 prefactor * spinsum];
 
+(*neutron charged current - degenerate*)
 kappandegen[eb_, t_, mue_, mun_, nb_, yp_, knu_, cost_, ui_]:= Module[{kfn, sp, sn, mt, ebmt, spinsum, prefactor, pdenom},
 mt = NUCMASS * t;
 kfn = Sqrt[2 * mun * NUCMASS];
@@ -140,6 +147,7 @@ spinsum = Sum[(1 - nfd[e0pm[knu, sp, sn, eb, ui, 1], mue, t]) * thetapm[-knu, sp
 	{sp, {-1, 1}}, {sn, {-1, 1}}];
 prefactor * spinsum];
 
+(*proton charged current - nondegenerate neutrons*)
 kappap[eb_, t_, mue_, nb_, yp_, knu_, cost_, ui_]:= Module[{kperp, kz, prefactor, mt, ebmt, spinsum, sn, sp, pdenom},
 kz = knu * cost;
 kperp = knu * Sqrt[1 - cost^2];
@@ -153,6 +161,7 @@ spinsum = Sum[(1 - nfd[e0pm[knu, sp, sn, eb, ui, -1], -mue, t]) * (1 - thetapm[k
 	 * Exp[-kperp^2 / (2 * mt) * (1 - Exp[-ebmt]) / (ebmt + 1 - Exp[-ebmt]) - (kz^2 + e0pm[knu, sp, sn, eb, ui, -1]^2)/(4*mt)]), {sp, {-1, 1}}, {sn, {-1, 1}}];
 prefactor * spinsum];
 
+(*proton charged current - degenerate neutrons *)
 kappapdegen[eb_, t_, mue_, mun_, nb_, yp_, knu_, cost_, ui_]:= Module[{kfn, sp, sn, mt, ebmt, spinsum, prefactor, pdenom},
 mt = NUCMASS * t;
 kfn = Sqrt[2 * mun * NUCMASS];
@@ -276,8 +285,8 @@ zpr = qperp^2 * texp^(1/4) / (eb * (1 - Sqrt[texp]));
 prefactor = (knupr^2 * n) / (4 * (2 * Pi)^(5 / 2) * Cosh[GP * eb / (4 * mt)] * Sqrt[texp]) * Sqrt[NUCMASS / (t * qz^2)];
 spinsum = Sum[abar = Round[NUCMASS * Abs[q0 - deltasspr[eb, GP - 2, s, spr]] / eb];
 exponent = - (NUCMASS * q0 + (GP - 2) * (s - spr) * eb / 4)^2 / (2 * qz^2 * mt);
-polaravg = cosq^2 * Exp[exponent] + (1 - cosq^2) * BesselI[abar, z];
-polaravgpr = cosq^2 * Exp[2 * exponent] + (1 - cosq^2) * BesselI[abar, zpr];
+polaravg = cosq^2 * Exp[exponent] + (1 - cosq^2) * BesselI[abar, z] * Exp[-qperp^2 / (2 * eb) * (1 + t) / (1 - t)];
+polaravgpr = cosq^2 * Exp[2 * exponent] + (1 - cosq^2) * BesselI[abar, zpr] * Exp[-qperp^2 / (2 * eb) * (1 + Sqrt[t]) / (1 - Sqrt[t])];
 blockingpref = n * Sinh[eb / (2 * mt)] * Exp[q0 / t] / (Cosh[GP * eb / (4 * mt)]) * 2 * Pi^(3/2) / (eb * Sqrt[mt]);
 mredncp[s, spr, cost, costpr, phi] * (Exp[(GP - 2) * s * eb / (4 * mt)] * polaravg
 - Exp[(GP - 2) * s * eb / (2 * mt)] * blockingpref * polaravgpr),
@@ -299,13 +308,15 @@ mubar = mue / Sqrt[eb];
 tbar = t / Sqrt[eb];
 ifunc[qbar_]:= If[qbar > 0, Log[(1 + Exp[mubar / tbar]) / (1 + Exp[(mubar - qbar) / tbar])],
 	Log[(1 + Exp[(mubar + 2 * qbar) / tbar]) / (1 + Exp[(mubar + qbar) / tbar])]] / (Exp[qbar / tbar] - 1);
-NIntegrate[q0 = (kperp^2 - kbar^2 * (1 - hc^2)) / (2 * kbar * (1 + hc)); kperp * (1 - hc) * (1 - (hc * kbar - q0) / Sqrt[kperp^2 + (hc * kbar - q0)^2])
-	* Exp[-kperp^2 / 2] * BesselI[0, kperp * kbar * Sqrt[1 - hc^2]] * ifunc[q0], {kperp, 0, 10 * (kbar + tbar)}]
+NIntegrate[q0 = (kperp^2 - kbar^2 * (1 - hc^2)) / (2 * kbar * (1 + hc)); 
+	kperp * (1 - hc) * (1 - (hc * kbar - q0) / Sqrt[kperp^2 + (hc * kbar - q0)^2])
+	* Exp[-kperp^2 / 2] * BesselI[0, kperp * kbar * Sqrt[1 - hc^2]] 
+	* ifunc[q0], {kperp, 0, Infinity}]
 ];
 
 kappaenc[eb_, t_, mue_, knu_, cost_, ise_]:=Module[{prefactor, rest, h, sgn},
 sgn = If[ise, 1, -1];
-prefactor = eb^2 * t / (8 * Pi^3);
+prefactor = eb^2 * t / (8 * Pi^3) * Exp[-knu^2 * (1 - cost^2) / (2 * eb)];
 rest = 4 * SINTW^4 * jfunc[knu, mue, t, cost, eb] + (1 + 2 * sgn * SINTW^2)^2 * jfunc[knu, mue, t, -cost, eb];
 prefactor * rest];
 
@@ -325,31 +336,31 @@ samples = RandomChoice[probs -> flatpairs, nsamples];
 vals = (subfunc @@@ samples);
 Total[vals] / nsamples];
 
-llmcncdiff[integrandfunc_, eb_, t_, mu_, knu_, cost_, knupr_, costpr_, phi_, nsamples_, isprot_]:=Module[{nmax, rangen, vals, flatweights, flatpairs, probs, samples, subfunc, weightfunc},
+llmcncdiff[integrandfunc_, eb_, t_, mu_, knu_, cost_, knupr_, costpr_, phi_, nsamples_, isprot_]:=Module[{nmax, rangen, vals, flatweights, flatpairs, probs, samples, subfunc, weightfunc, weightnorm},
 nmax = Floor[If[mu > 0, If[isprot,(mu + 5 * t) * NUCMASS / (2 * eb), (mu + 5 * t)^2 / (2 * eb) + 1], If[isprot, (5 * NUCMASS * t) / (2 * eb), (5 * t)^2 / (2 * eb) + 1]]];
 rangen = Range[0, nmax];
-weightfunc[n_, npr_]:=Exp[- (n + Abs[n - npr]) * eb / (t * NUCMASS)] * 
-	(1 - Exp[- eb / (t *  NUCMASS)]) * (1 - Exp[- 2 * eb / (t * NUCMASS)]) / 
+weightfunc[n_, npr_]:=Exp[- (n + Abs[n - npr]) * eb / (t * NUCMASS)];
+weightnorm =  (1 - Exp[- eb / (t *  NUCMASS)]) * (1 - Exp[- 2 * eb / (t * NUCMASS)]) / 
 	(1 + Exp[-eb / (t * NUCMASS)] + Exp[- 2 * eb / (t * NUCMASS)]);
-subfunc[n_, npr_]:= integrandfunc[eb, t, mu, knu, cost, knupr, costpr, phi, n, npr] / weightfunc[n, npr];
+subfunc[n_, npr_]:= integrandfunc[eb, t, mu, knu, cost, knupr, costpr, phi, n, npr] / (weightfunc[n, npr] * weightnorm);
 flatweights = Flatten[Table[weightfunc[n, npr], {n, rangen}, {npr, rangen}]];
 flatpairs = Flatten[Table[{n, npr}, {n, rangen}, {npr, rangen}], 1];
-probs = flatweights / Total[flatweights];
-samples = RandomChoice[probs -> flatpairs, nsamples];
+(*probs = flatweights / Total[flatweights];*)
+samples = RandomChoice[flatweights -> flatpairs, nsamples];
 vals = (subfunc @@@ samples);
 Total[vals] / nsamples];
 
-llmcnc[integrandfunc_, eb_, t_, mu_, knu_, cost_, nsamples_, isprot_]:=Module[{nmax, rangen, vals, flatweights, flatpairs, probs, samples, subfunc, weightfunc},
+llmcnc[integrandfunc_, eb_, t_, mu_, knu_, cost_, nsamples_, isprot_]:=Module[{nmax, rangen, vals, flatweights, flatpairs, probs, samples, subfunc, weightfunc, weightnorm},
 nmax = Floor[If[mu > 0, (mu + 5 * t)^2 / (2 * eb), If[isprot, (5 * NUCMASS * t) / (2 * eb), (5 * t)^2 / (2 * eb)]]];
 rangen = Range[0, nmax];
-weightfunc[n_, npr_]:=Exp[- (n + Abs[n - npr]) * eb / (t * NUCMASS)] * 
-	(1 - Exp[- eb / (t *  NUCMASS)]) * (1 - Exp[- 2 * eb / (t * NUCMASS)]) / 
+weightfunc[n_, npr_]:=Exp[- (n + Abs[n - npr]) * eb / (t * NUCMASS)];
+weightnorm = (1 - Exp[- eb / (t *  NUCMASS)]) * (1 - Exp[- 2 * eb / (t * NUCMASS)]) / 
 	(1 + Exp[-eb / (t * NUCMASS)] + Exp[- 2 * eb / (t * NUCMASS)]);
-subfunc[n_, npr_]:= integrandfunc[eb, t, mu, knu, cost, n, npr] / weightfunc[n, npr];
+subfunc[n_, npr_]:= integrandfunc[eb, t, mu, knu, cost, n, npr] / (weightfunc[n, npr] * weightnorm);
 flatweights = Flatten[Table[weightfunc[n, npr], {n, rangen}, {npr, rangen}]];
 flatpairs = Flatten[Table[{n, npr}, {n, rangen}, {npr, rangen}], 1];
-probs = flatweights / Total[flatweights];
-samples = RandomChoice[probs -> flatpairs, nsamples];
+(*probs = flatweights / Total[flatweights];*)
+samples = RandomChoice[flatweights -> flatpairs, nsamples];
 vals = (subfunc @@@ samples);
 Total[vals] / nsamples];
 
@@ -454,7 +465,7 @@ kappanmcnc[{eb_, t_, mun_, knu_, cost_}]:=NIntegrate[Sum[kappanncintegrand[eb, t
 	
 (* opacity for scattering on electrons *)
 kappaencintegrand[eb_, t_, mue_, knu_, cost_, costpr_, phi_, h_, iselec_]:= Module[{knupr, qperp, q0, q, qz, cosnunupr, prefactor, helsum, ifunc},
-prefactor = eb * t / (16 * Pi^4);
+prefactor = eb * t / (32 * Pi^4);
 knupr = Max[{0, knu * (h + cost) / (h + costpr)}];
 q0 = knupr - knu;
 cosnunupr = cost * costpr + Sqrt[(1 - cost^2) * (1 - costpr^2)] * Cos[phi];
@@ -463,7 +474,7 @@ qz = knupr * costpr - knu * cost;
 qperp = Sqrt[q^2 - qz^2];
 ifunc = If[q0 > 0, Log[(1 + Exp[mue / t]) / (1 + Exp[(mue - q0) / t])] / (Exp[q0 / t] - 1),
 	Log[(1 + Exp[(mue + 2 * q0) / t])/ (1 + Exp[(mue + q0) / t])] / (Exp[q0 / t] - 1)];
-helsum = knupr^2 * ifunc * Exp[-qperp^2 / (2 * eb)] * If[iselec, mrednce[h, h, cost, costpr], mredncex[h, h, cost, costpr]];
+helsum = knupr^2 / Abs[h + costpr] * ifunc * Exp[-qperp^2 / (2 * eb)] * If[iselec, mrednce[h, h, cost, costpr], mredncex[h, h, cost, costpr]];
 prefactor * helsum];
 
 kappaemcnc[{eb_, t_, mue_, knu_, cost_, iselec_}]:= NIntegrate[Sum[kappaencintegrand[eb, t, mue, knu, cost, costpr, phi, h, iselec], 
