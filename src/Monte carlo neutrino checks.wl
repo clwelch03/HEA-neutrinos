@@ -323,6 +323,24 @@ prefactor * rest];
 
 (*Opacities - Monte Carlo*)
 
+(*generated precompiled inr*)
+inrgenerator[{n1_, n2_}]:=Compile[
+	{{x, _Real}},
+	Module[{in, inmin, innew, inminnew, rtemp, n, r},
+	n = Max[{n1, n2}];
+	r = Min[{n1, n2}];
+	in = Sqrt[x^n / Factorial[n]] * Exp[-x / 2];
+	inmin = Sqrt[x^(n - 1) / Factorial[n - 1]] * Exp[-x / 2];
+	For[rtemp = 1, rtemp <= r, rtemp++,
+	innew = - Sqrt[x / rtemp] * in + Sqrt[n / rtemp] * inmin;
+	inminnew = Sqrt[n / x] * (innew - Sqrt[rtemp / n] * inmin);
+	in = innew;
+	inmin = inminnew;];
+	in],
+	CompilationTarget -> "C",
+	RuntimeOptions -> "Speed"
+];
+
 (*does monte carlo sum over landau levels*)
 llmc[integrandfunc_, eb_, t_, mue_, mun_, mup_, knu_, cost_, ui_, nsamples_, isn_]:=Module[{vals, nemax, npmax, flatweights, flatpairs, probs, samples, subfunc, weightfunc},
 nemax = Floor[If[isn, (Max[{2 * t, knu, mue + 2 * t}] + ui + MSPLIT + (GP - 2 - GN) * eb / (4 * NUCMASS))^2 / (2 * eb), (Max[{2 * t, knu, mue + 2 * t}] - ui - MSPLIT + (GP - 2 - GN) * eb / (4 * NUCMASS))^2 / (2 * eb)]];
@@ -336,32 +354,34 @@ samples = RandomChoice[probs -> flatpairs, nsamples];
 vals = (subfunc @@@ samples);
 Total[vals] / nsamples];
 
-llmcncdiff[integrandfunc_, eb_, t_, mu_, knu_, cost_, knupr_, costpr_, phi_, nsamples_, isprot_]:=Module[{nmax, rangen, vals, flatweights, flatpairs, probs, samples, subfunc, weightfunc, weightnorm},
+llmcncdiff[integrandfunc_, eb_, t_, mu_, knu_, cost_, knupr_, costpr_, phi_, nsamples_, isprot_]:=Module[{nmax, rangen, vals, flatweights, flatpairs, probs, samples, subfunc, weightfunc, weightnorm, inrsamples},
 nmax = Floor[If[mu > 0, If[isprot,(mu + 5 * t) * NUCMASS / (2 * eb), (mu + 5 * t)^2 / (2 * eb) + 1], If[isprot, (5 * NUCMASS * t) / (2 * eb), (5 * t)^2 / (2 * eb) + 1]]];
 rangen = Range[0, nmax];
 weightfunc[n_, npr_]:=Exp[- (n + Abs[n - npr]) * eb / (t * NUCMASS)];
 weightnorm =  (1 - Exp[- eb / (t *  NUCMASS)]) * (1 - Exp[- 2 * eb / (t * NUCMASS)]) / 
 	(1 + Exp[-eb / (t * NUCMASS)] + Exp[- 2 * eb / (t * NUCMASS)]);
-subfunc[n_, npr_]:= integrandfunc[eb, t, mu, knu, cost, knupr, costpr, phi, n, npr] / (weightfunc[n, npr] * weightnorm);
+subfunc[{n_, npr_, inr_}]:= integrandfunc[eb, t, mu, knu, cost, knupr, costpr, phi, n, npr, inr] / (weightfunc[n, npr] * weightnorm);
 flatweights = Flatten[Table[weightfunc[n, npr], {n, rangen}, {npr, rangen}]];
 flatpairs = Flatten[Table[{n, npr}, {n, rangen}, {npr, rangen}], 1];
 (*probs = flatweights / Total[flatweights];*)
 samples = RandomChoice[flatweights -> flatpairs, nsamples];
-vals = (subfunc @@@ samples);
-Total[vals] / nsamples];
+inrsamples = ParallelMap[inrgenerator, samples];
+vals = ParallelMap[subfunc, Join[samples, List /@ inrsamples, 2]];
+{Total[vals] / nsamples, StandardDeviation[vals]}];
 
-llmcnc[integrandfunc_, eb_, t_, mu_, knu_, cost_, nsamples_, isprot_]:=Module[{nmax, rangen, vals, flatweights, flatpairs, probs, samples, subfunc, weightfunc, weightnorm},
+llmcnc[integrandfunc_, eb_, t_, mu_, knu_, cost_, nsamples_, isprot_]:=Module[{nmax, rangen, vals, flatweights, flatpairs, probs, samples, subfunc, weightfunc, weightnorm, inrsamples},
 nmax = Floor[If[mu > 0, (mu + 5 * t)^2 / (2 * eb), If[isprot, (5 * NUCMASS * t) / (2 * eb), (5 * t)^2 / (2 * eb)]]];
 rangen = Range[0, nmax];
 weightfunc[n_, npr_]:=Exp[- (n + Abs[n - npr]) * eb / (t * NUCMASS)];
 weightnorm = (1 - Exp[- eb / (t *  NUCMASS)]) * (1 - Exp[- 2 * eb / (t * NUCMASS)]) / 
 	(1 + Exp[-eb / (t * NUCMASS)] + Exp[- 2 * eb / (t * NUCMASS)]);
-subfunc[n_, npr_]:= integrandfunc[eb, t, mu, knu, cost, n, npr] / (weightfunc[n, npr] * weightnorm);
+subfunc[{n_, npr_, inr_}]:= integrandfunc[eb, t, mu, knu, cost, n, npr, inr] / (weightfunc[n, npr] * weightnorm);
 flatweights = Flatten[Table[weightfunc[n, npr], {n, rangen}, {npr, rangen}]];
 flatpairs = Flatten[Table[{n, npr}, {n, rangen}, {npr, rangen}], 1];
 (*probs = flatweights / Total[flatweights];*)
 samples = RandomChoice[flatweights -> flatpairs, nsamples];
-vals = (subfunc @@@ samples);
+inrsamples = ParallelMap[inrgenerator, samples];
+vals = ParallelMap[subfunc, Join[samples, List /@ inrsamples, 2]];
 Total[vals] / nsamples];
 
 (*Calculates inn^2 for monte carlo integration*)
@@ -424,20 +444,18 @@ kappapmc[{eb_, t_, mue_, mun_, mup_, knu_, cost_, ui_, nsamples_}]:= llmc[kappap
 	
 (*elastic opacities*)
 (*integrand for scattering on protons*)
-kappapncintegrand[eb_, t_, mup_, knu_, cost_, knupr_, costpr_, phi_, s_, spr_, n_, npr_]:= Module[{qz, ep, eppr, kz, innsq, wperpsq},
+kappapncintegrand[eb_, t_, mup_, knu_, cost_, knupr_, costpr_, phi_, s_, spr_, n_, npr_, inr_]:= Module[{qz, ep, eppr, kz, wperpsq},
 qz = knupr * costpr - knu * cost;
 kz = (knupr - knu + qz^2 / (2 * NUCMASS) + (npr - n) * eb / NUCMASS + (GP - 2) * eb / (4 * NUCMASS) * (s - spr)) * NUCMASS / qz;
 ep = kz^2 / (2 * NUCMASS) + n * eb / NUCMASS - (GP - 2) * s * eb / (4 * NUCMASS);
 eppr = (kz - qz)^2 / (2 * NUCMASS) + npr * eb / NUCMASS - (GP - 2) * spr * eb / (4 * NUCMASS);
 wperpsq = knu^2 * (1 - cost^2) + knupr^2 * (1 - costpr^2) - 2 * knu * knupr * Sqrt[1 - cost^2] * Sqrt[1 - costpr^2] * Cos[phi];
-innsq = If[n <= npr, (wperpsq / (2 * eb))^(npr - n) * Exp[-wperpsq / (2 * eb)] * Factorial[n] / Factorial[npr] * LaguerreL[n, npr - n, wperpsq / (2 * eb)]^2,
-	(wperpsq / (2 * eb))^(n - npr) * Exp[-wperpsq / (2 * eb)] * Factorial[npr] / Factorial[n] * LaguerreL[npr, n - npr, wperpsq / (2 * eb)]^2];
-eb * knupr^2 * NUCMASS / (Abs[qz] * (2 * Pi)^4) * mredncp[s, spr, cost, costpr, phi] * nfd[ep, mup, t] * (1 - nfd[eppr, mup, t]) * innsq];
+eb * knupr^2 * NUCMASS / (Abs[qz] * (2 * Pi)^4) * mredncp[s, spr, cost, costpr, phi] * nfd[ep, mup, t] * (1 - nfd[eppr, mup, t]) * inr[wperpsq / (2 * eb)]^2];
 
 (*opacity for in one LL for proton scattering*)
-kappapncdiffnnpr[eb_, t_, mup_, knu_, cost_, knupr_, costpr_, phi_, n_, npr_]:=Sum[kappapncintegrand[eb, t, mup, knu, cost, knupr, costpr, phi, s, spr, n, npr], 
+kappapncdiffnnpr[eb_, t_, mup_, knu_, cost_, knupr_, costpr_, phi_, n_, npr_, inr_]:=Sum[kappapncintegrand[eb, t, mup, knu, cost, knupr, costpr, phi, s, spr, n, npr, inr], 
 	{s, {-1, 1}}, {spr, {-1, 1}}]
-kappapncnnpr[eb_, t_, mup_, knu_, cost_, n_, npr_]:=NIntegrate[Sum[kappapncintegrand[eb, t, mup, knu, cost, knupr, costpr, phi, s, spr, n, npr], 
+kappapncnnpr[eb_, t_, mup_, knu_, cost_, n_, npr_, inr_]:=NIntegrate[Sum[kappapncintegrand[eb, t, mup, knu, cost, knupr, costpr, phi, s, spr, n, npr, inr], 
 	{s, {-1, 1}}, {spr, {-1, 1}}], {costpr, -1, 1}, {phi, 0, 2 * Pi}, {knupr, 0, 20 * t}, Method -> {"AdaptiveMonteCarlo", MaxPoints -> 1000000}];
 	
 (*full opacity for scattering on protons*)
@@ -507,10 +525,10 @@ resultsp = {};
 CloseKernels[];
 LaunchKernels[numkern];
 Print["Starting neutron opacity"];
-temp = Parallelize[Map[kappanmc, params]];
+temp = ParallelMap[kappanmc, params];
 AppendTo[resultsn, temp];
 Print["Done with neutrons, starting proton opacity"];
-temp = Parallelize[Map[kappapmc, params]];
+temp = ParallelMap[kappapmc, params];
 AppendTo[resultsp, temp];
 CloseKernels[];
 finalresults = {};
@@ -559,15 +577,15 @@ resultse = {};
 CloseKernels[];
 LaunchKernels[numkern];
 Print["Starting proton opacity"];
-AppendTo[resultsp, Parallelize[Map[kappapmcnc, paramsp]]];
+AppendTo[resultsp, ParallelMap[kappapmcnc, paramsp]];
 Print["Starting electron opacity"];
-AppendTo[resultse, Parallelize[Map[kappaemcnc, paramse]]];
+AppendTo[resultse, ParallelMap[kappaemcnc, paramse]];
 Print["Starting diff neutron opacity"];
-AppendTo[resultsdn, Parallelize[Map[kappanmcncdiff, paramsdn]]];
+AppendTo[resultsdn, ParallelMap[kappanmcncdiff, paramsdn]];
 Print["Starting neutron opacity"];
-AppendTo[resultsn, Parallelize[Map[kappanmcnc, paramsn]]];
+AppendTo[resultsn, ParallelMap[kappanmcnc, paramsn]];
 Print["Starting diff proton opacity"];
-AppendTo[resultsdp, Parallelize[Map[kappapmcncdiff, paramsdp]]];
+AppendTo[resultsdp, ParallelMap[kappapmcncdiff, paramsdp]];
 CloseKernels[];
 Print[resultsp];
 Print[resultsdp];
