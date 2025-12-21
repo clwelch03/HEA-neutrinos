@@ -323,9 +323,10 @@ prefactor * rest];
 
 (*Opacities - Monte Carlo*)
 
+NUMKERN = 4;
+
 (*generated precompiled inr*)
-inrgenerator[{n1_, n2_}]:=Compile[
-	{{x, _Real}},
+inrgenerator[{n1_, n2_}]:= Compile[{{x}},
 	Module[{in, inmin, innew, inminnew, rtemp, n, r},
 	n = Max[{n1, n2}];
 	r = Min[{n1, n2}];
@@ -336,26 +337,25 @@ inrgenerator[{n1_, n2_}]:=Compile[
 	inminnew = Sqrt[n / x] * (innew - Sqrt[rtemp / n] * inmin);
 	in = innew;
 	inmin = inminnew;];
-	in],
-	CompilationTarget -> "C",
-	RuntimeOptions -> "Speed"
-];
+	in]];
 
 (*does monte carlo sum over landau levels*)
 llmc[integrandfunc_, eb_, t_, mue_, mun_, mup_, knu_, cost_, ui_, nsamples_, isn_]:=Module[{vals, nemax, npmax, flatweights, flatpairs, probs, samples, subfunc, weightfunc},
 nemax = Floor[If[isn, (Max[{2 * t, knu, mue + 2 * t}] + ui + MSPLIT + (GP - 2 - GN) * eb / (4 * NUCMASS))^2 / (2 * eb), (Max[{2 * t, knu, mue + 2 * t}] - ui - MSPLIT + (GP - 2 - GN) * eb / (4 * NUCMASS))^2 / (2 * eb)]];
 npmax = Floor[If[mup > 0, (mup + 5 * t) * NUCMASS / eb, 5 * t * NUCMASS / eb]];
 weightfunc[np_, ne_]:=Exp[-np * eb / (t * NUCMASS)] / (nemax + 1) * (1 - Exp[- eb / (t *  NUCMASS)]);
-subfunc[np_, ne_]:= integrandfunc[eb, t, mue, mun, mup, knu, cost, ui, ne, np]  / weightfunc[np, ne];
+subfunc[{np_, ne_}]:= integrandfunc[eb, t, mue, mun, mup, knu, cost, ui, ne, np]  / weightfunc[np, ne];
 flatweights = Flatten[Table[weightfunc[np, ne], {np, 0, npmax}, {ne, 0, nemax}]];
 flatpairs = Flatten[Table[{np, ne}, {np, 0, npmax}, {ne, 0, nemax}], 1];
 probs = flatweights / Total[flatweights];
 samples = RandomChoice[probs -> flatpairs, nsamples];
-vals = (subfunc @@@ samples);
+LaunchKernels[NUMKERN];
+vals = ParallelMap[subfunc, samples];
+CloseKernels[];
 Total[vals] / nsamples];
 
 llmcncdiff[integrandfunc_, eb_, t_, mu_, knu_, cost_, knupr_, costpr_, phi_, nsamples_, isprot_]:=Module[{nmax, rangen, vals, flatweights, flatpairs, probs, samples, subfunc, weightfunc, weightnorm, inrsamples},
-nmax = Floor[If[mu > 0, If[isprot,(mu + 5 * t) * NUCMASS / (2 * eb), (mu + 5 * t)^2 / (2 * eb) + 1], If[isprot, (5 * NUCMASS * t) / (2 * eb), (5 * t)^2 / (2 * eb) + 1]]];
+nmax = Min[{100, Floor[If[mu > 0, If[isprot,(mu + 5 * t) * NUCMASS / (2 * eb), (mu + 5 * t)^2 / (2 * eb) + 1], If[isprot, (5 * NUCMASS * t) / (2 * eb), (5 * t)^2 / (2 * eb) + 1]]]}];
 rangen = Range[0, nmax];
 weightfunc[n_, npr_]:=Exp[- (n + Abs[n - npr]) * eb / (t * NUCMASS)];
 weightnorm =  (1 - Exp[- eb / (t *  NUCMASS)]) * (1 - Exp[- 2 * eb / (t * NUCMASS)]) / 
@@ -365,12 +365,18 @@ flatweights = Flatten[Table[weightfunc[n, npr], {n, rangen}, {npr, rangen}]];
 flatpairs = Flatten[Table[{n, npr}, {n, rangen}, {npr, rangen}], 1];
 (*probs = flatweights / Total[flatweights];*)
 samples = RandomChoice[flatweights -> flatpairs, nsamples];
+LaunchKernels[NUMKERN];
 inrsamples = ParallelMap[inrgenerator, samples];
+CloseKernels[];
+Print["inr done, starting opacity"];
+LaunchKernels[NUMKERN];
+DistributeDefinitions[inrsamples];
 vals = ParallelMap[subfunc, Join[samples, List /@ inrsamples, 2]];
+CloseKernels[];
 {Total[vals] / nsamples, StandardDeviation[vals]}];
 
 llmcnc[integrandfunc_, eb_, t_, mu_, knu_, cost_, nsamples_, isprot_]:=Module[{nmax, rangen, vals, flatweights, flatpairs, probs, samples, subfunc, weightfunc, weightnorm, inrsamples},
-nmax = Floor[If[mu > 0, (mu + 5 * t)^2 / (2 * eb), If[isprot, (5 * NUCMASS * t) / (2 * eb), (5 * t)^2 / (2 * eb)]]];
+nmax = Min[{100, Floor[If[mu > 0, (mu + 5 * t)^2 / (2 * eb), If[isprot, (5 * NUCMASS * t) / (2 * eb), (5 * t)^2 / (2 * eb)]]]}];
 rangen = Range[0, nmax];
 weightfunc[n_, npr_]:=Exp[- (n + Abs[n - npr]) * eb / (t * NUCMASS)];
 weightnorm = (1 - Exp[- eb / (t *  NUCMASS)]) * (1 - Exp[- 2 * eb / (t * NUCMASS)]) / 
@@ -380,9 +386,15 @@ flatweights = Flatten[Table[weightfunc[n, npr], {n, rangen}, {npr, rangen}]];
 flatpairs = Flatten[Table[{n, npr}, {n, rangen}, {npr, rangen}], 1];
 (*probs = flatweights / Total[flatweights];*)
 samples = RandomChoice[flatweights -> flatpairs, nsamples];
+LaunchKernels[NUMKERN];
 inrsamples = ParallelMap[inrgenerator, samples];
+CloseKernels[];
+Print["inr done, starting opacity"];
+LaunchKernels[NUMKERN];
+DistributeDefinitions[inrsamples];
 vals = ParallelMap[subfunc, Join[samples, List /@ inrsamples, 2]];
-Total[vals] / nsamples];
+CloseKernels[];
+{Total[vals] / nsamples, StandardDeviation[vals]}];
 
 (*Calculates inn^2 for monte carlo integration*)
 nmcme[mun_, mup_, mue_, kn_, cosn_, phin_, knu_, cost_, sn_, sp_, np_, ne_, eb_, t_, ui_, cose_, elec_]:= Module[{wperpsq, nezero, inn, innpmin, innemin, innepmin},
@@ -444,13 +456,13 @@ kappapmc[{eb_, t_, mue_, mun_, mup_, knu_, cost_, ui_, nsamples_}]:= llmc[kappap
 	
 (*elastic opacities*)
 (*integrand for scattering on protons*)
-kappapncintegrand[eb_, t_, mup_, knu_, cost_, knupr_, costpr_, phi_, s_, spr_, n_, npr_, inr_]:= Module[{qz, ep, eppr, kz, wperpsq},
+kappapncintegrand[eb_, t_, mup_, knu_?NumericQ, cost_?NumericQ, knupr_?NumericQ, costpr_?NumericQ, phi_?NumericQ, s_, spr_, n_, npr_, inr_]:= Module[{qz, ep, eppr, kz, wperpsq},
 qz = knupr * costpr - knu * cost;
 kz = (knupr - knu + qz^2 / (2 * NUCMASS) + (npr - n) * eb / NUCMASS + (GP - 2) * eb / (4 * NUCMASS) * (s - spr)) * NUCMASS / qz;
 ep = kz^2 / (2 * NUCMASS) + n * eb / NUCMASS - (GP - 2) * s * eb / (4 * NUCMASS);
 eppr = (kz - qz)^2 / (2 * NUCMASS) + npr * eb / NUCMASS - (GP - 2) * spr * eb / (4 * NUCMASS);
 wperpsq = knu^2 * (1 - cost^2) + knupr^2 * (1 - costpr^2) - 2 * knu * knupr * Sqrt[1 - cost^2] * Sqrt[1 - costpr^2] * Cos[phi];
-eb * knupr^2 * NUCMASS / (Abs[qz] * (2 * Pi)^4) * mredncp[s, spr, cost, costpr, phi] * nfd[ep, mup, t] * (1 - nfd[eppr, mup, t]) * inr[wperpsq / (2 * eb)]^2];
+eb * knupr^2 * NUCMASS / (Abs[qz] * (2 * Pi)^4) * mredncp[s, spr, cost, costpr, phi] * nfd[ep, mup, t] * (1 - nfd[eppr, mup, t]) * inr[Evaluate[wperpsq / (2 * eb)]]^2];
 
 (*opacity for in one LL for proton scattering*)
 kappapncdiffnnpr[eb_, t_, mup_, knu_, cost_, knupr_, costpr_, phi_, n_, npr_, inr_]:=Sum[kappapncintegrand[eb, t, mup, knu, cost, knupr, costpr, phi, s, spr, n, npr, inr], 
@@ -505,7 +517,7 @@ randomnu[{knu1_, knu2_, cost1_, cost2_, ui1_, ui2_}]:={RandomReal[{knu1, knu2}],
 randompair[{knu1_, knu2_, cost1_, cost2_, phi1_, phi2_}]:={RandomReal[{knu1, knu2}], RandomReal[{cost1, cost2}], 
 	RandomReal[{knu1, knu2}], RandomReal[{cost1, cost2}], RandomReal[{phi1, phi2}]};
 
-opacitywrapper[t1_, t2_, n1_, n2_, yp1_, yp2_, eb1_, eb2_, knu1_, knu2_, cost1_, cost2_, ui1_, ui2_, numcond_, numnu_, numkern_]:=Module[
+opacitywrapper[t1_, t2_, n1_, n2_, yp1_, yp2_, eb1_, eb2_, knu1_, knu2_, cost1_, cost2_, ui1_, ui2_, numcond_, numnu_]:=Module[
 {icond, mulist, inu, cond, nus, params, resultsn, 
 	resultsp, finalresults, numsamples, counter, temp},
 cond = Map[randomcond, ConstantArray[{t1, t2, n1, n2, yp1, yp2, eb1, eb2}, numcond]];
@@ -523,14 +535,12 @@ For[counter = 0, counter < 10, counter++, AppendTo[params, {cond[[icond]][[4]], 
 resultsn = {};
 resultsp = {};
 CloseKernels[];
-LaunchKernels[numkern];
 Print["Starting neutron opacity"];
 temp = ParallelMap[kappanmc, params];
 AppendTo[resultsn, temp];
 Print["Done with neutrons, starting proton opacity"];
 temp = ParallelMap[kappapmc, params];
 AppendTo[resultsp, temp];
-CloseKernels[];
 finalresults = {};
 For[inu = 1, inu < numnu + 1, inu++, For[icond = 1, icond < numcond + 1, icond++,
 AppendTo[finalresults, {Mean[resultsn[[1,((inu - 1) * numcond + icond) * 10 - 9 ;; ((inu - 1) * numcond + icond) * 10]]],
@@ -544,7 +554,7 @@ AppendTo[finalresults, {Mean[resultsn[[1,((inu - 1) * numcond + icond) * 10 - 9 
 	cond[[icond]][[4]], cond[[icond]][[1]], mulist[[icond]][[1]], cond[[icond]][[2]], cond[[icond]][[3]], nus[[inu]][[1]], nus[[inu]][[2]], nus[[inu]][[3]]}]]];
 finalresults];
 
-scatteringwrapper[t1_, t2_, n1_, n2_, yp1_, yp2_, eb1_, eb2_, knu1_, knu2_, cost1_, cost2_, phi1_, phi2_, numcond_, numnu_, numkern_]:=Module[
+scatteringwrapper[t1_, t2_, n1_, n2_, yp1_, yp2_, eb1_, eb2_, knu1_, knu2_, cost1_, cost2_, phi1_, phi2_, numcond_, numnu_]:=Module[
 {icond, mulist, inu, cond, nus, paramsdn, paramsn, paramsp, paramsdp, paramse, 
 	resultsdn, resultsn, resultsdp, resultsp, resultse, finalresults, nump, counter},
 cond = Map[randomcond, ConstantArray[{t1, t2, n1, n2, yp1, yp2, eb1, eb2}, numcond]];
@@ -574,8 +584,6 @@ resultsn = {};
 resultsdp = {};
 resultsp = {};
 resultse = {};
-CloseKernels[];
-LaunchKernels[numkern];
 Print["Starting proton opacity"];
 AppendTo[resultsp, ParallelMap[kappapmcnc, paramsp]];
 Print["Starting electron opacity"];
@@ -586,7 +594,6 @@ Print["Starting neutron opacity"];
 AppendTo[resultsn, ParallelMap[kappanmcnc, paramsn]];
 Print["Starting diff proton opacity"];
 AppendTo[resultsdp, ParallelMap[kappapmcncdiff, paramsdp]];
-CloseKernels[];
 Print[resultsp];
 Print[resultsdp];
 finalresults = {};
