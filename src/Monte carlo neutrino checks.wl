@@ -323,7 +323,7 @@ prefactor * rest];
 
 (*Opacities - Monte Carlo*)
 
-NUMKERN = 4;
+NUMKERN = 7;
 
 (*generated precompiled inr*)
 inrgenerator[{n1_, n2_}]:= Compile[{{x}},
