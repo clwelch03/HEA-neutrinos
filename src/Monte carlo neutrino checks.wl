@@ -270,7 +270,7 @@ spinsum = Sum[mredncnint[s, spr, cost], {s, {-1, 1}}, {spr, {-1, 1}}];
 prefactor * spinsum];
 	
 kappapncdiff[eb_, t_, n_, knu_, cost_, knupr_, costpr_, phi_]:= Module[
-{prefactor, mt, q, q0, cosq, qz, qperp, cosnunupr, spinsum, exponent, zpr, z, 
+{prefactor, mt, q, q0, cosq, qz, qperp, cosnunupr, spinsum, exponent, exppol, zpr, z, 
 polaravg, polaravgpr, texp, blockingpref, abar},
 cosnunupr = cost * costpr + Sqrt[1 - cost^2] * Sqrt[1 - costpr^2] * Cos[phi];
 q = Sqrt[knu^2 + knupr^2 - 2 * knu * knupr * cosnunupr];
@@ -281,16 +281,16 @@ qperp = Sqrt[q^2 - qz^2];
 mt = NUCMASS * t;
 texp = Exp[-eb / mt];
 z = qperp^2 * Sqrt[texp] / (eb * (1 - texp));
-zpr = qperp^2 * t / (eb * (1 - t^2));
+zpr = qperp^2 * texp / (eb * (1 - texp^2));
 prefactor = (knupr^2 * n) / (4 * (2 * Pi)^(5 / 2) * Cosh[GP * eb / (4 * mt)] * Sqrt[texp]) * Sqrt[NUCMASS / (t * qz^2)];
 spinsum = Sum[abar = Round[NUCMASS * Abs[q0 - deltasspr[eb, GP - 2, s, spr]] / eb];
-Print[abar];
 exponent = - (NUCMASS * q0 + (GP - 2) * (s - spr) * eb / 4)^2 / (2 * qz^2 * mt);
-polaravg = cosq^2 * Exp[exponent] + (1 - cosq^2) * BesselI[abar, z] * Exp[-qperp^2 / (2 * eb) * (1 + t) / (1 - t)];
-polaravgpr = cosq^2 * Exp[2 * exponent] + (1 - cosq^2) * BesselI[abar, zpr] * Exp[-qperp^2 / (2 * eb) * (1 + t^2) / (1 - t^2)];
+exppol = - (abar * eb - NUCMASS * Abs[q0 - deltasspr[eb, GP - 2, s, spr]])^2;
+polaravg = cosq^2 * Exp[exponent] + (1 - cosq^2) * BesselI[abar, z] * Exp[exppol / (2 * qz^2 * mt)] * Exp[-qperp^2 / (2 * eb) * (1 + texp) / (1 - texp)];
+polaravgpr = cosq^2 * Exp[2 * exponent] + (1 - cosq^2) * BesselI[abar, zpr] * Exp[exppol / (qz^2 * mt)] * Exp[-qperp^2 / (2 * eb) * (1 + texp^2) / (1 - texp^2)];
 blockingpref = n * Sinh[eb / (2 * mt)] / (Cosh[GP * eb / (4 * mt)]) * 2 * Pi^(3/2) / (eb * Sqrt[mt]);
 mredncp[s, spr, cost, costpr, phi] * (Exp[(GP - 2) * s * eb / (4 * mt)] * polaravg
-- Exp[(GP - 2) * spr * eb / (2 * mt)] * blockingpref * polaravgpr),
+- Exp[(GP - 2) * (spr + s) * eb / (4 * mt)] * blockingpref * polaravgpr),
 {s, {-1, 1}}, {spr, {-1, 1}}];
 prefactor * spinsum];
 
