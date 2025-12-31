@@ -281,15 +281,16 @@ qperp = Sqrt[q^2 - qz^2];
 mt = NUCMASS * t;
 texp = Exp[-eb / mt];
 z = qperp^2 * Sqrt[texp] / (eb * (1 - texp));
-zpr = qperp^2 * texp^(1/4) / (eb * (1 - Sqrt[texp]));
+zpr = qperp^2 * t / (eb * (1 - t^2));
 prefactor = (knupr^2 * n) / (4 * (2 * Pi)^(5 / 2) * Cosh[GP * eb / (4 * mt)] * Sqrt[texp]) * Sqrt[NUCMASS / (t * qz^2)];
 spinsum = Sum[abar = Round[NUCMASS * Abs[q0 - deltasspr[eb, GP - 2, s, spr]] / eb];
+Print[abar];
 exponent = - (NUCMASS * q0 + (GP - 2) * (s - spr) * eb / 4)^2 / (2 * qz^2 * mt);
 polaravg = cosq^2 * Exp[exponent] + (1 - cosq^2) * BesselI[abar, z] * Exp[-qperp^2 / (2 * eb) * (1 + t) / (1 - t)];
-polaravgpr = cosq^2 * Exp[2 * exponent] + (1 - cosq^2) * BesselI[abar, zpr] * Exp[-qperp^2 / (2 * eb) * (1 + Sqrt[t]) / (1 - Sqrt[t])];
-blockingpref = n * Sinh[eb / (2 * mt)] * Exp[q0 / t] / (Cosh[GP * eb / (4 * mt)]) * 2 * Pi^(3/2) / (eb * Sqrt[mt]);
+polaravgpr = cosq^2 * Exp[2 * exponent] + (1 - cosq^2) * BesselI[abar, zpr] * Exp[-qperp^2 / (2 * eb) * (1 + t^2) / (1 - t^2)];
+blockingpref = n * Sinh[eb / (2 * mt)] / (Cosh[GP * eb / (4 * mt)]) * 2 * Pi^(3/2) / (eb * Sqrt[mt]);
 mredncp[s, spr, cost, costpr, phi] * (Exp[(GP - 2) * s * eb / (4 * mt)] * polaravg
-- Exp[(GP - 2) * s * eb / (2 * mt)] * blockingpref * polaravgpr),
+- Exp[(GP - 2) * spr * eb / (2 * mt)] * blockingpref * polaravgpr),
 {s, {-1, 1}}, {spr, {-1, 1}}];
 prefactor * spinsum];
 
