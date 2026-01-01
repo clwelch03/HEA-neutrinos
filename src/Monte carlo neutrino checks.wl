@@ -26,7 +26,8 @@ nfd[e_, mu_, t_]:= 1 / (Exp[(e - mu) / t] + 1);(*If[(e - mu) / t > 50, 0, If[(e 
 munofn[n_, eb_, t_]:= FindRoot[-n + NIntegrate[k^2 / (2 * Pi^2) * (nfd[k^2 / (2 * NUCMASS) + GN * eb / (4 * NUCMASS), mu, t] 
 	+ nfd[k^2 / (2 * NUCMASS) - GN * eb / (4 * NUCMASS), mu, t]), {k, 0, Infinity}], {mu, t}];
 mueofn[n_, eb_, t_]:= If[t^2 / eb > 100, FindRoot[-n + NIntegrate[k^2 / Pi^2 * nfd[k, mu, t], {k, 0, Infinity}], {mu, t}],
-	FindRoot[-n + NIntegrate[eb / (4 * Pi^2) * nfd[Sqrt[k^2 + ELECMASS^2], mu, t] + Sum[eb / (2 * Pi^2) * nfd[Sqrt[k^2 + 2 * ne * eb + ELECMASS^2], mu, t], 
+	FindRoot[-n + NIntegrate[eb / (4 * Pi^2) * nfd[Sqrt[k^2 + ELECMASS^2], mu, t] - eb / (4 * Pi^2) * nfd[Sqrt[k^2 + ELECMASS^2], -mu, t] + Sum[eb / (2 * Pi^2) * nfd[Sqrt[k^2 + 2 * ne * eb + ELECMASS^2], mu, t] 
+	- eb / (2 * Pi^2) * nfd[Sqrt[k^2 + 2 * ne * eb + ELECMASS^2], -mu, t], 
 	{ne, 1, Ceiling[t^2 / eb * 5]}], {k, -Infinity, Infinity}], {mu, t}]];
 mupofn[n_, eb_, t_]:= If[NUCMASS * t / eb > 100, FindRoot[-n + NIntegrate[k^2 / (2 * Pi^2) * (nfd[k^2 / (2 * NUCMASS) + GP * eb / (4 * NUCMASS), mu, t] 
 	+ nfd[k^2 / (2 * NUCMASS) - GP * eb / (4 * NUCMASS), mu, t]), {k, 0, Infinity}], {mu, t}],
