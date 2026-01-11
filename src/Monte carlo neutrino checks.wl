@@ -99,20 +99,20 @@ mredncexstrip[h_, hpr_]:=If[h != hpr, 0, If[h == 1, 4 * SINTW^4, (1 - 2 * SINTW^
 
 (*Opacities - analytical approx*)
 (*neutron charged current - nondegenerate*)
-kappan[eb_, t_, mue_, nb_, yp_, knu_, cost_, ui_]:= Module[{kperp, kz, prefactor, mt, ebmt, spinsum, sp, sn, pdenom},
+kappan[eb_, t_, mue_, nb_, yp_, knu_, cost_, ui_]:= Module[{kperp, kz, prefactor, mt, ebmt, spinsum, sp, sn, pdenom, muhat},
 kz = knu * cost;
 kperp = knu * Sqrt[1 - cost^2];
 mt = NUCMASS * t;
 ebmt = eb / mt;
 prefactor = nb * (1 - yp) * eb / (8 * Pi * Cosh[GN * ebmt / 4]);
-pdenom = ((1 + Exp[-eb / mt]) * Cosh[GP * eb / (4 * mt)] + (1 - Exp[-eb / mt]) * Sinh[(GP - 2) * eb / (4 * mt)]);
 spinsum = Sum[Sum[(1 - nfd[e0pm[knu, sp, sn, eb, ui, 1], mue, t]) * thetapm[-knu, sp, sn, eb, ui, -1] * vtildecc[e0pm[knu, sp, sn, eb, ui, 1]^2 / (2 * eb), sp, sn, cost] * Exp[GN * sn * ebmt / 4]
-	 * (1 - nb * yp * Exp[(GP - 2) * sp * ebmt / 4] / pdenom * (Pi / mt)^(3/2) * (1 - Exp[-ebmt]) / (ebmt + 1 - Exp[-ebmt]) * Cosh[kz * e0pm[knu, sp, sn, eb, ui, 1] / (2 * mt)]
+	 * (1 - nb * yp * Exp[(GP - 2) * sp * ebmt / 4] / Cosh[GP * ebmt / 4] * (Pi / mt)^(3/2) * (1 - Exp[-ebmt]) / (ebmt + 1 - Exp[-ebmt]) * Cosh[kz * e0pm[knu, sp, sn, eb, ui, 1] / (2 * mt)]
 	 * Exp[-kperp^2 / (2 * mt) * (1 - Exp[-ebmt]) / (ebmt + 1 - Exp[-ebmt]) - (kz^2 + e0pm[knu, sp, sn, eb, ui, 1]^2)/(4*mt)]), {sp, {-1, 1}}], {sn, {-1, 1}}];
-prefactor * spinsum];
+muhat = t * Log[yp / (1 - yp) * (2 * Cosh[GN * ebmt / 4] * Sinh[ebmt / 2]) / (ebmt * Cosh[GP * ebmt / 4])];
+prefactor * spinsum * (1 + 1.1 * knu / NUCMASS) * 1 / (1 - nfd[knu, mue + muhat, t])];
 
 (*neutron charged current - degenerate*)
-kappandegen[eb_, t_, mue_, mun_, nb_, yp_, knu_, cost_, ui_]:= Module[{kfn, sp, sn, mt, ebmt, spinsum, prefactor, pdenom},
+kappandegen[eb_, t_, mue_, mun_, nb_, yp_, knu_, cost_, ui_]:= Module[{kfn, sp, sn, mt, ebmt, spinsum, prefactor, pdenom, mup},
 mt = NUCMASS * t;
 kfn = Sqrt[2 * mun * NUCMASS];
 ebmt = eb / mt;
@@ -120,10 +120,11 @@ prefactor = nb * (1 - yp) * eb / (8 * Pi);
 spinsum = Sum[(1 - nfd[e0pm[knu, sp, sn, eb, ui, 1], mue, t]) * thetapm[-knu, sp, sn, eb, ui, -1] * vtildecc[e0pm[knu, sp, sn, eb, ui, 1]^2 / (2 * eb), sp, sn, cost] * (1
 	- Exp[(GP - 2) * sp * ebmt / 4]/(2 * Cosh[GP * ebmt / 4]) * (1 - Exp[-ebmt]) * bigb[Sqrt[(kfn^2 - GN * sn * eb / 2)], (1 - Exp[-ebmt]) / ebmt, Exp[GN * sn * ebmt / 8] / Cosh[GN * ebmt / 8], eb, t, knu, cost]),
 	{sp, {-1, 1}}, {sn, {-1, 1}}];
-prefactor * spinsum];
+mup = t * Log[nb * yp * Sinh[ebmt / 2] * (2 * Pi / mt)^(3/2) / (ebmt * Cosh[GP * ebmt / 4])];
+prefactor * spinsum * (1 + 1.1 * knu / NUCMASS) * 1 / (1 - nfd[knu, mue + mup - mun, t])];
 
 (*proton charged current - nondegenerate neutrons*)
-kappap[eb_, t_, mue_, nb_, yp_, knu_, cost_, ui_]:= Module[{kperp, kz, prefactor, mt, ebmt, spinsum, sn, sp, pdenom},
+kappap[eb_, t_, mue_, nb_, yp_, knu_, cost_, ui_]:= Module[{kperp, kz, prefactor, mt, ebmt, spinsum, sn, sp, pdenom, muhat},
 kz = knu * cost;
 kperp = knu * Sqrt[1 - cost^2];
 mt = NUCMASS * t;
@@ -134,10 +135,11 @@ spinsum = Sum[(1 - nfd[e0pm[knu, sp, sn, eb, ui, -1], -mue, t]) * (1 - thetapm[k
 	vtildecc[e0pm[knu, sp, sn, eb, ui, -1]^2 / (2 * eb), -sp, -sn, cost]] * Exp[(GP - 2) * sp * ebmt / 4] 
 	 * (1 - nb * (1 - yp) * Exp[GN * sn * ebmt / 4] / Cosh[GN * ebmt / 4] * (Pi / mt)^(3/2) * (1 - Exp[-ebmt]) / (ebmt + 1 - Exp[-ebmt]) * Cosh[kz * e0pm[knu, sp, sn, eb, ui, -1] / (2 * mt)]
 	 * Exp[-kperp^2 / (2 * mt) * (1 - Exp[-ebmt]) / (ebmt + 1 - Exp[-ebmt]) - (kz^2 + e0pm[knu, sp, sn, eb, ui, -1]^2)/(4*mt)]), {sp, {-1, 1}}, {sn, {-1, 1}}];
-prefactor * spinsum];
+muhat = t * Log[yp / (1 - yp) * (2 * Cosh[GN * ebmt / 4] * Sinh[ebmt / 2]) / (ebmt * Cosh[GP * ebmt / 4])];
+prefactor * spinsum * (1 - 7.1 * knu / NUCMASS) * 1 / (1 - nfd[knu, -mue - muhat, t])];
 
 (*proton charged current - degenerate neutrons *)
-kappapdegen[eb_, t_, mue_, mun_, nb_, yp_, knu_, cost_, ui_]:= Module[{kfn, sp, sn, mt, ebmt, spinsum, prefactor, pdenom},
+kappapdegen[eb_, t_, mue_, mun_, nb_, yp_, knu_, cost_, ui_]:= Module[{kfn, sp, sn, mt, ebmt, spinsum, prefactor, pdenom, mup},
 mt = NUCMASS * t;
 kfn = Sqrt[2 * mun * NUCMASS];
 ebmt = eb / mt;
@@ -145,7 +147,8 @@ prefactor = nb * yp * eb * Exp[ebmt / 2] / (8 * Pi * Cosh[GP * ebmt / 4]);
 spinsum = Sum[(1 - nfd[e0pm[knu, sp, sn, eb, ui, -1], -mue, t]) * (1 - thetapm[knu, sp, sn, eb, ui, 1]) * vtildecc[e0pm[knu, sp, sn, eb, ui, -1]^2 / (2 * eb), sp, sn, cost] * Exp[(GP - 2) * sp * ebmt / 4] * (1
 	- (1 - Exp[-ebmt]) * bigb[Sqrt[kfn^2 - GN * sn * eb / 2], (1 - Exp[-ebmt]) / ebmt, Exp[GN * sn * ebmt / 8] / Cosh[GN * ebmt / 8], eb, t, knu, cost]),
 	{sp, {-1, 1}}, {sn, {-1, 1}}];
-prefactor * spinsum];
+mup = t * Log[nb * yp * Sinh[ebmt / 2] * (2 * Pi / mt)^(3/2) / (ebmt * Cosh[GP * ebmt / 4])];
+prefactor * spinsum * (1 - 7.1 * knu / NUCMASS) * 1 / (1 - nfd[knu, mun - mup - mue, t])];
 
 (*Differential emissivities - analytic approx*)
 (* charged current (urca) *)
@@ -272,12 +275,13 @@ q0 = knupr - knu;
 prefactor = knupr^2 * NUCMASS^2 / (64 * Pi^5);
 spinsum = Sum[e0 = k0func[eb, GN, s, spr, q0, q]^2 / (2 * NUCMASS) - GN * eb * s / (4 * NUCMASS);
 mredncn[s, spr, cost, costpr, phi] * (q0 + t * 
-Log[(1 + Exp[(e0 + q0 - mu) / t]) / (1 + Exp[(e0 - mu) / t])]) / (Exp[q0 / t] - 1),{s, {-1, 1}}, {spr, {-1, 1}}];
+Log[(1 + Exp[(e0 - q0 - mu) / t]) / (1 + Exp[(e0 - mu) / t])]) / (Exp[q0 / t] - 1),{s, {-1, 1}}, {spr, {-1, 1}}];
 prefactor * spinsum];
 
 kappanncdegen[eb_, t_, mu_, knu_, cost_]:=Module[{prefactor, spinsum},
-prefactor = NUCMASS / (16 * Pi^4) * (2 * Pi^4 * t^3 / 15 + Pi^2 * t * knu^2 / 3 + 8 * t^2 * knu * Zeta[3]);
-spinsum = Sum[mredncnint[s, spr, cost], {s, {-1, 1}}, {spr, {-1, 1}}];
+prefactor = NUCMASS * t / (4 * Pi^3) * Sqrt[2 * mu * NUCMASS];
+spinsum = Sum[mredncnint[s, spr, cost] * (knu + deltasspr[eb, GN, s, spr])^2 * HeavisideTheta[knu + deltasspr[eb, GN, s, spr]],
+	 {s, {-1, 1}}, {spr, {-1, 1}}];
 prefactor * spinsum];
 	
 kappapncdiff[eb_, t_, n_, knu_, cost_, knupr_, costpr_, phi_]:= Module[
@@ -293,12 +297,12 @@ mt = NUCMASS * t;
 texp = Exp[-eb / mt];
 z = qperp^2 * Sqrt[texp] / (eb * (1 - texp));
 zpr = qperp^2 * texp / (eb * (1 - texp^2));
-prefactor = (knupr^2 * n) / (4 * (2 * Pi)^(5 / 2) * Cosh[GP * eb / (4 * mt)] * Sqrt[texp]) * Sqrt[NUCMASS / (t * qz^2)];
+prefactor = (knupr^2 * n) / (4 * (2 * Pi)^(5 / 2) * Cosh[GP * eb / (4 * mt)] * Sqrt[texp]) * Sqrt[NUCMASS / t];
 spinsum = Sum[abar = Round[NUCMASS * Abs[q0 - deltasspr[eb, GP - 2, s, spr]] / eb];
 exponent = - (NUCMASS * q0 + (GP - 2) * (s - spr) * eb / 4)^2 / (2 * qz^2 * mt);
 exppol = - (abar * eb - NUCMASS * Abs[q0 - deltasspr[eb, GP - 2, s, spr]])^2;
-polaravg = cosq^2 * Exp[exponent] + (1 - cosq^2) * BesselI[abar, z] * Exp[exppol / (2 * qz^2 * mt)] * Exp[-qperp^2 / (2 * eb) * (1 + texp) / (1 - texp)];
-polaravgpr = cosq^2 * Exp[2 * exponent] + (1 - cosq^2) * BesselI[abar, zpr] * Exp[exppol / (qz^2 * mt)] * Exp[-qperp^2 / (2 * eb) * (1 + texp^2) / (1 - texp^2)];
+polaravg = Exp[exponent] / Sqrt[Abs[qz] * q] + (1 - cosq^2) * BesselI[abar, z] / Abs[qz] * Exp[exppol / (2 * qz^2 * mt)] * Exp[-qperp^2 / (2 * eb) * (1 + texp) / (1 - texp)];
+polaravgpr = Exp[2 * exponent] / Sqrt[Abs[qz] * q] + (1 - cosq^2) * BesselI[abar, zpr] / Abs[qz] * Exp[exppol / (qz^2 * mt)] * Exp[-qperp^2 / (2 * eb) * (1 + texp^2) / (1 - texp^2)];
 blockingpref = n * Sinh[eb / (2 * mt)] / (Cosh[GP * eb / (4 * mt)]) * 2 * Pi^(3/2) / (eb * Sqrt[mt]);
 mredncp[s, spr, cost, costpr, phi] * (Exp[(GP - 2) * s * eb / (4 * mt)] * polaravg
 - Exp[(GP - 2) * (spr + s) * eb / (4 * mt)] * blockingpref * polaravgpr),
@@ -345,12 +349,14 @@ inrgenerator[{n1_, n2_}]:= Compile[{{x}},
 	n = Max[{n1, n2}];
 	r = Min[{n1, n2}];
 	in = Sqrt[x^n / Factorial[n]] * Exp[-x / 2];
+	If[n > 0,
 	inmin = Sqrt[x^(n - 1) / Factorial[n - 1]] * Exp[-x / 2];
+	If[r > 0,
 	For[rtemp = 1, rtemp <= r, rtemp++,
 	innew = - Sqrt[x / rtemp] * in + Sqrt[n / rtemp] * inmin;
 	inminnew = Sqrt[n / x] * (innew - Sqrt[rtemp / n] * inmin);
 	in = innew;
-	inmin = inminnew;];
+	inmin = inminnew;];];];
 	in]];
 
 (*does monte carlo sum over landau levels for cc*)
@@ -444,7 +450,7 @@ If[ee < Sqrt[2 * ne * eb], 0, 1 / 2 * ee * kn^2 / Sqrt[ee^2 - 2 * ne * eb]
 (*opacity for capture on neutrons with specified landau levels*)
 kappanmcnenp[eb_, t_, mue_, mun_, mup_, knu_, cost_, ui_, ne_, np_, inr_]:= Module[{knmax},
 knmax = If[mun > 0, Sqrt[2 * (mun + 5 * t) * NUCMASS], Sqrt[2 * (5 * t) * NUCMASS]];
-Quiet[NIntegrate[Sum[nmcspinsum[mun, mup, mue, kn, cosn, phin, knu, cost, np, ne, eb, t, ui, sp, sn], {sp, {-1, 1}}, {sn, {-1, 1}}], 
+Quiet[(1 + 1.1 * knu / NUCMASS) * 1 / (1 - nfd[knu, mue + mup - mun, t]) * NIntegrate[Sum[nmcspinsum[mun, mup, mue, kn, cosn, phin, knu, cost, np, ne, eb, t, ui, sp, sn], {sp, {-1, 1}}, {sn, {-1, 1}}], 
 	 {kn, 0, knmax}, {cosn, -1, 1}, {phin, 0, 2 * Pi}, Method -> {"AdaptiveMonteCarlo", MaxPoints -> 1000000}]]];
 (*total opacity for capture on neutrons*)	
 kappanmc[{eb_, t_, mue_, mun_, mup_, knu_, cost_, ui_, nsamples_}]:= llmc[kappanmcnenp, eb, t, mue, mun, mup, knu, cost, ui, nsamples, True];
@@ -467,7 +473,7 @@ If[ee < Sqrt[2 * ne * eb], 0, 1 / 2 * ee * kn^2 / Sqrt[ee^2 - 2 * ne * eb]
 (*opacity for capture on protons with specified landau levels*)
 kappapmcnenp[eb_, t_, mue_, mun_, mup_, knu_, cost_, ui_, ne_, np_, inr_]:= Module[{knmax},
 knmax = If[mun > 0, Sqrt[2 * (mun + 20 * t) * NUCMASS], Sqrt[2 * (20 * t) * NUCMASS]];
-Quiet[NIntegrate[Sum[pmcspinsum[mun, mup, mue, kn, cosn, phin, knu, cost, np, ne, eb, t, ui, sp, sn], {sp, {-1, 1}}, {sn, {-1, 1}}], 
+Quiet[(1 - 7.1 * knu / NUCMASS) * 1 / (1 - nfd[knu, mun - mup - mue, t]) * NIntegrate[Sum[pmcspinsum[mun, mup, mue, kn, cosn, phin, knu, cost, np, ne, eb, t, ui, sp, sn], {sp, {-1, 1}}, {sn, {-1, 1}}], 
 	 {kn, 0, knmax}, {cosn, -1, 1}, {phin, 0, 2 * Pi}, Method -> {"AdaptiveMonteCarlo", MaxPoints -> 1000000}]]];
 (*total opacity for capture on protons*)	
 kappapmc[{eb_, t_, mue_, mun_, mup_, knu_, cost_, ui_, nsamples_}]:= llmc[kappapmcnenp, eb, t, mue, mun, mup, knu, cost, ui, nsamples, False];
@@ -476,11 +482,11 @@ kappapmc[{eb_, t_, mue_, mun_, mup_, knu_, cost_, ui_, nsamples_}]:= llmc[kappap
 (*integrand for scattering on protons*)
 kappapncintegrand[eb_, t_, mup_, knu_?NumericQ, cost_?NumericQ, knupr_?NumericQ, costpr_?NumericQ, phi_?NumericQ, s_, spr_, n_, npr_, inr_]:= Module[{qz, ep, eppr, kz, wperpsq},
 qz = knupr * costpr - knu * cost;
-kz = (knupr - knu + qz^2 / (2 * NUCMASS) + (npr - n) * eb / NUCMASS + (GP - 2) * eb / (4 * NUCMASS) * (s - spr)) * NUCMASS / qz;
+kz = (knupr - knu + qz^2 / (2 * NUCMASS) + (npr - n) * eb / NUCMASS - (GP - 2) * (spr - s) * eb / (4 * NUCMASS)) * NUCMASS / qz;
 ep = kz^2 / (2 * NUCMASS) + n * eb / NUCMASS - (GP - 2) * s * eb / (4 * NUCMASS);
 eppr = (kz - qz)^2 / (2 * NUCMASS) + npr * eb / NUCMASS - (GP - 2) * spr * eb / (4 * NUCMASS);
 wperpsq = knu^2 * (1 - cost^2) + knupr^2 * (1 - costpr^2) - 2 * knu * knupr * Sqrt[1 - cost^2] * Sqrt[1 - costpr^2] * Cos[phi];
-eb * knupr^2 * NUCMASS / (2 * Abs[qz] * (2 * Pi)^4) * mredncp[s, spr, cost, costpr, phi] * nfd[ep, mup, t] * (1 - nfd[eppr, mup, t]) * inr[Evaluate[wperpsq / (2 * eb)]]^2];
+eb * knupr^2 * NUCMASS / (2 * Abs[qz] * (2 * Pi)^4) * mredncp[s, spr, cost, costpr, phi] * nfd[ep, mup, t] * (1 - nfd[eppr, mup, t]) * Quiet[inr[wperpsq / (2 * eb)]]^2];
 
 (*opacity for in one LL for proton scattering*)
 kappapncdiffnnpr[eb_, t_, mup_, knu_, cost_, knupr_, costpr_, phi_, n_, npr_, inr_]:=Sum[kappapncintegrand[eb, t, mup, knu, cost, knupr, costpr, phi, s, spr, n, npr, inr], 

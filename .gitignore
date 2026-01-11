@@ -1,3 +1,6 @@
 .DS_Store
 *.nb
 /_plotdump
+src/opacity csvs/eos.compo
+src/opacity csvs/eos.t
+src/opacity csvs/eos.yq
