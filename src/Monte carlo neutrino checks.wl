@@ -17,7 +17,7 @@ HBARC = 197.3269718; (*all calculations will be done in fm*)
 NUCMASS = 2 * 939.5653 * 938.272 / (939.5653 + 938.272) / HBARC; (*average nucleon mass*)
 MSPLIT = (939.5653 - 938.272) / HBARC; (* nucleon mass splitting *)
 ELECMASS = 0.511 / HBARC; (* electron mass, only for use in kinematics *)
-GA = 1.27; (*no g-t discrepancy for electroweak*)
+GA = 1.267; (*no g-t discrepancy for electroweak*)
 G15TOFM = 19.5 * Sqrt[4 * Pi / 137] / HBARC^2; (*convert B in 10^15 G to eB in fm^2 with the convention that alpha = e^2/4pi*)
 GP = 5.5858; GN = -3.8263; (*gyromagnetic ratios for nucleons, note that GE=2.002 so the g-2 is negligible for leptons*)
 
