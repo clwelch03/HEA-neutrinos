@@ -28,7 +28,7 @@ munofn[n_, eb_, t_]:= FindRoot[-n + NIntegrate[k^2 / (2 * Pi^2) * (nfd[k^2 / (2 
 mueofn[n_, eb_, t_]:= If[t^2 / eb > 100, FindRoot[-n + NIntegrate[k^2 / Pi^2 * nfd[k, mu, t], {k, 0, Infinity}], {mu, t}],
 	FindRoot[-n + NIntegrate[eb / (4 * Pi^2) * nfd[Sqrt[k^2 + ELECMASS^2], mu, t] - eb / (4 * Pi^2) * nfd[Sqrt[k^2 + ELECMASS^2], -mu, t] + Sum[eb / (2 * Pi^2) * nfd[Sqrt[k^2 + 2 * ne * eb + ELECMASS^2], mu, t] 
 	- eb / (2 * Pi^2) * nfd[Sqrt[k^2 + 2 * ne * eb + ELECMASS^2], -mu, t], 
-	{ne, 1, Ceiling[t^2 / eb * 5]}], {k, -Infinity, Infinity}], {mu, t}]];
+	{ne, 1, Ceiling[(Max[{mu, 0}] + 5 * t)^2 / eb]}], {k, -Infinity, Infinity}], {mu, t}]];
 mupofn[n_, eb_, t_]:= If[NUCMASS * t / eb > 100, FindRoot[-n + NIntegrate[k^2 / (2 * Pi^2) * (nfd[k^2 / (2 * NUCMASS) + GP * eb / (4 * NUCMASS), mu, t] 
 	+ nfd[k^2 / (2 * NUCMASS) - GP * eb / (4 * NUCMASS), mu, t]), {k, 0, Infinity}], {mu, t}],
 	FindRoot[-n + NIntegrate[eb / (4 * Pi^2) * nfd[k^2 / (2 * NUCMASS) - (GP - 2) * eb / (4 * NUCMASS), mu, t] 
@@ -382,9 +382,11 @@ Total[vals] / nsamples];
 llmcncdiff[integrandfunc_, eb_, t_, mu_, knu_, cost_, knupr_, costpr_, phi_, nsamples_, isprot_]:=Module[{nmax, rangen, vals, flatweights, flatpairs, probs, samples, subfunc, weightfunc, weightnorm, inrsamples},
 nmax = Min[{100, Floor[If[mu > 0, If[isprot,(mu + 5 * t) * NUCMASS / (2 * eb), (mu + 5 * t)^2 / (2 * eb) + 1], If[isprot, (5 * NUCMASS * t) / (2 * eb), (5 * t)^2 / (2 * eb) + 1]]]}];
 rangen = Range[0, nmax];
-weightfunc[n_, npr_]:=Exp[- (n + Abs[n - npr]) * eb / (t * NUCMASS)];
+(*weightfunc[n_, npr_]:=Exp[- (n + Abs[n - npr]) * eb / (t * NUCMASS)];
 weightnorm =  (1 - Exp[- eb / (t *  NUCMASS)]) * (1 - Exp[- 2 * eb / (t * NUCMASS)]) / 
-	(1 + Exp[-eb / (t * NUCMASS)] + Exp[- 2 * eb / (t * NUCMASS)]);
+	(1 + Exp[-eb / (t * NUCMASS)] + Exp[- 2 * eb / (t * NUCMASS)]);*)
+weightfunc[n_, npr_]:=Exp[-(n + npr) * eb / (t * NUCMASS)];
+weightnorm = (1 - Exp[-eb / (t * NUCMASS)])^2;
 subfunc[{n_, npr_, inr_}]:= integrandfunc[eb, t, mu, knu, cost, knupr, costpr, phi, n, npr, inr] / (weightfunc[n, npr] * weightnorm);
 flatweights = Flatten[Table[weightfunc[n, npr], {n, rangen}, {npr, rangen}]];
 flatpairs = Flatten[Table[{n, npr}, {n, rangen}, {npr, rangen}], 1];
