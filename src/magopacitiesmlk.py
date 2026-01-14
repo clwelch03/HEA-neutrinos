@@ -1,4 +1,5 @@
 from math import sqrt, exp, log, log10, erf, cos, tanh, sinh, cosh, pi, floor, ceil
+from numpy import arcsinh
 from scipy.optimize import fsolve
 from scipy.integrate import quad
 from scipy.special import iv as besseli
@@ -381,24 +382,34 @@ def kappap_nc_diff(eb, t, n, knu, cost, knupr, costpr, phi):
     z = qperp**2 * sqrt(texp) / (eb * (1 - texp))
     zpr = qperp**2 * texp / (eb * (1 - texp**2))
 
-    prefactor = GF**2 * knupr**2 * n / (4 * (2 * pi)**(5 / 2) * cosh(GP * ebmt / 4)) * sqrt(MN / t)
+    prefactor = GF**2 * knupr**2 * n / (4 * (2 * pi)**(5 / 2) * cosh(GP * ebmt / 4)) * sqrt(MN / (t * qz**2))
     
     spin_sum = 0 
     for s in [-1, 1]:
         for spr in [-1, 1]:
             dss = delta_sspr(eb, GP - 2, s, spr)
             alpha = int(round(MN * abs(q0 - dss) / eb))
-            exponent = - (MN * (q0 - dss))**2 / (2 * qz**2 * MN * t)
-            exppol = - (alpha * eb - MN * (q0 - dss))**2 / (2 * qz**2 * MN * t)
+            exponent = - (MN / qz * (q0 - dss))**2 / (2 * MN * t)
+            exppol = - (alpha * eb - MN * abs(q0 - dss))**2 / (2 * qz**2 * MN * t)
+
+            if z < 10:
+                ia = besseli(alpha, z)
+            else:
+                ia = 1 / (sqrt(2 * pi * z) * (1 + alpha**2 / z**2)**(1 / 4)) * exp(-alpha * arcsinh(alpha / z) + z * sqrt(1 + alpha**2 / z**2))
             
-            polar_avg = exp(exponent) / sqrt(abs(qz) * q) + (1 - cosq**2) * besseli(alpha, z) / abs(qz) \
+            if zpr < 10:
+                iapr = besseli(alpha, zpr)
+            else:
+                iapr = 1 / (sqrt(2 * pi * zpr) * (1 + alpha**2 / zpr**2)**(1 / 4)) * exp(-alpha * arcsinh(alpha / zpr) + zpr * sqrt(1 + alpha**2 / zpr**2))
+            
+            polar_avg = exp(exponent) * sqrt(abs(cosq)) + (1 - cosq**2) * ia \
                 * exp(exppol - qperp**2 / (2 * eb) * (1 + texp) / (1 - texp))
-            polar_avg_blk = exp(2 * exponent) / sqrt(abs(qz) * q) + (1 - cosq**2) * besseli(alpha, zpr) / abs(qz) \
+            polar_avg_blk = exp(2 * exponent) * sqrt(abs(cosq)) + (1 - cosq**2) * iapr \
                 * exp(2 * exppol - qperp**2 / (2 * eb) * (1 + texp**2) / (1 - texp**2))
             blocking_pref = n * sinh(ebmt / 2) / cosh(GP * ebmt / 4) * 2 * pi**(3 / 2) / (eb * sqrt(MN * t))
 
-            spin_sum += mred_ncp(s, spr, cost, costpr, phi) * exp((GP - 2) * s * ebmt / 4) * polar_avg \
-                - exp((GP - 2) * spr * ebmt / 4) * blocking_pref * polar_avg_blk
+            spin_sum += mred_ncp(s, spr, cost, costpr, phi) * exp((GP - 2) * s * ebmt / 4) * (polar_avg \
+                - exp((GP - 2) * spr * ebmt / 4) * blocking_pref * polar_avg_blk)
     return prefactor * spin_sum
 
 def kappap_nc(eb, t, n, knu, cost):
