@@ -392,15 +392,16 @@ def kappap_nc_diff(eb, t, n, knu, cost, knupr, costpr, phi):
             exponent = - (MN / qz * (q0 - dss))**2 / (2 * MN * t)
             exppol = - (alpha * eb - MN * abs(q0 - dss))**2 / (2 * qz**2 * MN * t)
 
-            if z < 10:
-                ia = besseli(alpha, z)
-            else:
-                ia = 1 / (sqrt(2 * pi * z) * (1 + alpha**2 / z**2)**(1 / 4)) * exp(-alpha * arcsinh(alpha / z) + z * sqrt(1 + alpha**2 / z**2))
+            #if z < 10:
+            ia = besseli(alpha, z)
+            #elif a / z < 
+            #    ia = 1 / (sqrt(2 * pi * z) * (1 + alpha**2 / z**2)**(1 / 4)) * exp(-alpha * arcsinh(alpha / z) + z * sqrt(1 + alpha**2 / z**2))
             
-            if zpr < 10:
-                iapr = besseli(alpha, zpr)
-            else:
-                iapr = 1 / (sqrt(2 * pi * zpr) * (1 + alpha**2 / zpr**2)**(1 / 4)) * exp(-alpha * arcsinh(alpha / zpr) + zpr * sqrt(1 + alpha**2 / zpr**2))
+            #if zpr < 10:
+            iapr = besseli(alpha, zpr)
+            #else:
+            #    print(zpr)
+            #    iapr = 1 / (sqrt(2 * pi * zpr) * (1 + alpha**2 / zpr**2)**(1 / 4)) * exp(-alpha * arcsinh(alpha / zpr) + zpr * sqrt(1 + alpha**2 / zpr**2))
             
             polar_avg = exp(exponent) * sqrt(abs(cosq)) + (1 - cosq**2) * ia \
                 * exp(exppol - qperp**2 / (2 * eb) * (1 + texp) / (1 - texp))
