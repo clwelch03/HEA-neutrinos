@@ -459,6 +459,6 @@ def kappae_nc(eb, t, mue, knu, cost, isx):
     else:
         xsign = 1
     
-    prefactor = eb**2 * t / (8 * pi**3) * exp(-knu**2 * (1 - cost**2) / (2 * eb))
+    prefactor = GF**2 * eb**2 * t / (8 * pi**3) * exp(-knu**2 * (1 - cost**2) / (2 * eb))
     hel_sum = 4 * SINTW**4 * jfunc(knu, mue, t, cost, eb) + (1 + 2 * xsign * SINTW**2)**2 * jfunc(knu, mue, t, -cost, eb)
     return prefactor * hel_sum
