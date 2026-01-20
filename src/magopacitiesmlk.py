@@ -140,8 +140,8 @@ def vt_cc(x, sp, sn, cost):
 ##neutral current matrix elements
 #protons
 def mred_ncp(s, spr, cost, costpr, phi):
-    sint = sqrt(1 - cost**2)
-    sintpr = sqrt(1 - costpr**2)
+    sint = np.sqrt(1 - cost**2)
+    sintpr = np.sqrt(1 - costpr**2)
     if s == spr:
         return 1 / 2 * ((1 - 4 * SINTW**2)**2 * (1 + cost * costpr + sint * sintpr * cos(phi))
             + GA**2 * (1 + cost * costpr - sint * sintpr * cos(phi)) 
@@ -489,26 +489,26 @@ def kappap_nc_diff(eb, t, n, knu, cost, knupr, costpr, phi):
     return prefactor * spin_sum
 
 def synchp(eb, t, n, knu, cost, knupr, costpr, phi):
-    cos_kkpr = cost * costpr + sqrt((1 - cost**2) * (1 - costpr**2)) * cos(phi)
-    q = sqrt(knu**2 + knupr**2 + 2 * knu * knupr * cos_kkpr)
+    cos_kkpr = cost * costpr + np.sqrt((1 - cost**2) * (1 - costpr**2)) * np.cos(phi)
+    q = np.sqrt(knu**2 + knupr**2 + 2 * knu * knupr * cos_kkpr)
     q0 = knupr + knu
     ebmt = eb / (MN * t)
-    qz = knupr * costpr - knu * cost
+    qz = knupr * costpr + knu * cost
     cosq = qz / q
-    qperp = sqrt(q**2 - qz**2)
+    qperp = np.sqrt(q**2 - qz**2)
     texp = exp(-ebmt)
     z = qperp**2 * sqrt(texp) / (eb * (1 - texp))
     zpr = qperp**2 * texp / (eb * (1 - texp**2))
 
-    prefactor = GF**2 * knupr**2 * knu**2 * n / (4 * (2 * pi)**(11 / 2) * cosh(GP * ebmt / 4)) * sqrt(MN / (t * qz**2))
+    prefactor = GF**2 * knupr**2 * knu**2 * n / (4 * (2 * pi)**(11 / 2) * cosh(GP * ebmt / 4)) * np.sqrt(MN / (t * qz**2))
     
     spin_sum = 0 
     for s in [-1, 1]:
         for spr in [-1, 1]:
             dss = delta_sspr(eb, GP - 2, s, spr)
-            alpha = int(round(MN * abs(q0 - dss) / eb))
+            alpha = np.round(MN * np.abs(q0 - dss) / eb)
             exponent = - (MN / qz * (q0 - dss))**2 / (2 * MN * t)
-            exppol = - (alpha * eb - MN * abs(q0 - dss))**2 / (2 * qz**2 * MN * t)
+            exppol = - (alpha * eb - MN * np.abs(q0 - dss))**2 / (2 * qz**2 * MN * t)
 
             #if z < 10:
             ia = besseli(alpha, z)
@@ -521,10 +521,12 @@ def synchp(eb, t, n, knu, cost, knupr, costpr, phi):
             #    print(zpr)
             #    iapr = 1 / (sqrt(2 * pi * zpr) * (1 + alpha**2 / zpr**2)**(1 / 4)) * exp(-alpha * arcsinh(alpha / zpr) + zpr * sqrt(1 + alpha**2 / zpr**2))
             
-            polar_avg = exp(exponent) * sqrt(abs(cosq)) + (1 - cosq**2) * ia \
-                * exp(exppol - qperp**2 / (2 * eb) * (1 + texp) / (1 - texp))
-            polar_avg_blk = exp(2 * exponent) * sqrt(abs(cosq)) + (1 - cosq**2) * iapr \
-                * exp(2 * exppol - qperp**2 / (2 * eb) * (1 + texp**2) / (1 - texp**2))
+            #print(z, zpr, ia, iapr)
+
+            polar_avg = np.exp(exponent) * np.sqrt(np.abs(cosq)) + (1 - cosq**2) * ia \
+                * np.exp(exppol - qperp**2 / (2 * eb) * (1 + texp) / (1 - texp))
+            polar_avg_blk = np.exp(2 * exponent) * np.sqrt(np.abs(cosq)) + (1 - cosq**2) * iapr \
+                * np.exp(2 * exppol - qperp**2 / (2 * eb) * (1 + texp**2) / (1 - texp**2))
             blocking_pref = n * sinh(ebmt / 2) / cosh(GP * ebmt / 4) * 2 * pi**(3 / 2) / (eb * sqrt(MN * t))
 
             spin_sum += mred_ncp(s, spr, cost, costpr, phi) * exp((GP - 2) * s * ebmt / 4) * (polar_avg \
