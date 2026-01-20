@@ -240,6 +240,35 @@ def kappan(eb, t, mue, nb, yp, knu, cost, ui, corr_on = True):
             spin_sum += elec_kin * blocking
     return prefactor * spin_sum * corr
 
+def urcan(eb, t, mue, nb, yp, knu, cost, ui, corr_on = True):
+    kz = knu * cost
+    kperp = knu * sqrt(1 - cost**2)
+    ebmt = eb / (MN * t)
+    prefactor = GF**2 * COSTC**2 * nb * knu**2 * (1 - yp) * eb / (8 * pi**4 * cosh(GN * ebmt / 4))
+    #this has weak magnetism
+    if corr_on:
+        corr = (1 - 7.1 * knu / MN)
+    else:
+        corr = 1
+
+    spin_sum = 0
+    for sp in [-1, 1]:
+        for sn in [-1, 1]:
+            ee = e0pm(knu, sp, sn, eb, ui, -1)
+            elec_kin = (1 - nfd(ee, mue, t)) * thetapm(knu, sp, sn, eb, ui, -1) * vt_cc(ee**2 / (2 * eb), sp, sn, cost)
+            
+            eepl = e0pm(knu, sp, sn, eb, ui, 1)
+            if sp == sn:
+                pos_kin = nfd(eepl, -mue, t) * (1 - thetapm(knu, sp, sn, eb, ui, 1)) * vt_cc(eepl**2 / (2 * eb), sp, sn, cost)
+            else:
+                pos_kin = nfd(eepl, -mue, t) * (1 - thetapm(knu, sp, sn, eb, ui, 1)) * vt_cc(eepl**2 / (2 * eb), -sp, -sn, cost)
+
+            blocking = exp(GN * sn * ebmt / 4) * (1 - nb * yp * exp((GP - 2) * sp * ebmt / 4) / cosh(GP * ebmt / 4) 
+                * (pi / (MN * t))**(3 / 2) * (1 - exp(-ebmt)) / (ebmt + 1 - exp(-ebmt)) * cosh(kz * ee / (2 * MN * t))
+                * exp(-kperp**2 / (2 * MN * t) * (1 - exp(-ebmt)) / (ebmt + 1 - exp(-ebmt)) - (kz**2 + ee**2) / (4 * MN * t)))
+            spin_sum += (elec_kin + pos_kin) * blocking
+    return prefactor * spin_sum * corr
+
 def kappan_degen(eb, t, mue, mun, nb, yp, knu, cost, ui, corr_on = True):
     ebmt = eb / (MN * t)
     prefactor = GF**2 * COSTC**2 * nb * (1 - yp) * eb / pi 
@@ -289,6 +318,31 @@ def kappap(eb, t, mue, nb, yp, knu, cost, ui, corr_on = True):
             spin_sum += elec_kin * blocking
     return prefactor * spin_sum * corr
 
+def urcap(eb, t, mue, nb, yp, knu, cost, ui, corr_on = True):
+    kz = knu * cost
+    kperp = knu * sqrt(1 - cost**2)
+    ebmt = eb / (MN * t)
+    prefactor = GF**2 * COSTC**2 * knu**2 * nb * yp * eb * exp(ebmt / 2) / (8 * pi**4 * cosh(GP * ebmt / 4))
+    #isospin chemical potential
+    muhat = t * log(yp / (1 - yp) * (2 * cosh(GN * ebmt / 4) * sinh(ebmt / 2) / (ebmt * cosh(GP * ebmt / 4))))
+    #this has weak magnetism and stimulated absorption
+    if corr_on:
+        corr = (1 + 1.1 * knu / MN)
+    else:
+        corr = 1
+
+    spin_sum = 0
+    for sp in [-1, 1]:
+        for sn in [-1, 1]:
+            ee = e0pm(knu, sp, sn, eb, ui, 1)
+            elec_kin = nfd(ee, mue, t) * thetapm(-knu, sp, sn, eb, ui, -1) * vt_cc(ee**2 / (2 * eb), sp, sn, cost)
+
+            blocking = exp((GP - 2) * sp * ebmt / 4) * (1 - nb * (1 - yp) * exp(GN * sn * ebmt / 4) / cosh(GN * ebmt / 4) 
+                * (pi / (MN * t))**(3 / 2) * (1 - exp(-ebmt)) / (ebmt + 1 - exp(-ebmt)) * cosh(kz * ee / (2 * MN * t))
+                * exp(-kperp**2 / (2 * MN * t) * (1 - exp(-ebmt)) / (ebmt + 1 - exp(-ebmt)) - (kz**2 + ee**2) / (4 * MN * t)))
+            spin_sum += elec_kin * blocking
+    return prefactor * spin_sum * corr
+
 def kappap_degen(eb, t, mue, mun, nb, yp, knu, cost, ui, corr_on = True):
     ebmt = eb / (MN * t)
     prefactor = GF**2 * COSTC**2 * nb * yp * eb / pi 
@@ -328,6 +382,27 @@ def kappan_nc_diff(eb, t, n, knu, cost, knupr, costpr, phi):
                 * pi**2 / (MN * t * q) * exp(-q**2 / (4 * MN * t)) \
                 * (erf((q + 2 * k0) / (2 * sqrt(MN * t))) + erf((q - 2 * k0) / (2 * sqrt(MN * t))))
             spin_sum += factor * blocking
+    return prefactor * spin_sum
+
+def synchn(eb, t, n, knu, cost, knupr, costpr, phi):
+    cos_kkpr = cost * costpr + sqrt((1 - cost**2) * (1 - costpr**2)) * cos(phi)
+    q = sqrt(knu**2 + knupr**2 + 2 * knu * knupr * cos_kkpr)
+    q0 = knupr + knu
+    ebmt = eb / (MN * t)
+    if q < np.abs(q0 + GN * eb / (2 * MN)):
+        return 0
+
+    prefactor = GF**2 * knupr**2 * knu**2 * n / (4 * (2 * pi)**(11 / 2) * cosh(GN * ebmt / 4)) * sqrt(MN / t) / q
+    s = 1
+    spr = -1
+
+    spin_sum = 0
+    k0 = k0_func(eb, GN, s, spr, q0, q)
+    factor = mred_ncn(s, spr, cost, costpr, phi) * exp(GN * s * ebmt / 4)
+    blocking = exp(-k0**2 / (2 * MN * t)) - n * exp(GN * spr * ebmt / 4) / (sqrt(2) * cosh(GN * ebmt / 4)) \
+        * pi**2 / (MN * t * q) * exp(-q**2 / (4 * MN * t)) \
+        * (erf((q + 2 * k0) / (2 * sqrt(MN * t))) + erf((q - 2 * k0) / (2 * sqrt(MN * t))))
+    spin_sum += factor * blocking
     return prefactor * spin_sum
 
 def kappan_nc(eb, t, n, knu, cost):
@@ -383,6 +458,49 @@ def kappap_nc_diff(eb, t, n, knu, cost, knupr, costpr, phi):
     zpr = qperp**2 * texp / (eb * (1 - texp**2))
 
     prefactor = GF**2 * knupr**2 * n / (4 * (2 * pi)**(5 / 2) * cosh(GP * ebmt / 4)) * sqrt(MN / (t * qz**2))
+    
+    spin_sum = 0 
+    for s in [-1, 1]:
+        for spr in [-1, 1]:
+            dss = delta_sspr(eb, GP - 2, s, spr)
+            alpha = int(round(MN * abs(q0 - dss) / eb))
+            exponent = - (MN / qz * (q0 - dss))**2 / (2 * MN * t)
+            exppol = - (alpha * eb - MN * abs(q0 - dss))**2 / (2 * qz**2 * MN * t)
+
+            #if z < 10:
+            ia = besseli(alpha, z)
+            #elif a / z < 
+            #    ia = 1 / (sqrt(2 * pi * z) * (1 + alpha**2 / z**2)**(1 / 4)) * exp(-alpha * arcsinh(alpha / z) + z * sqrt(1 + alpha**2 / z**2))
+            
+            #if zpr < 10:
+            iapr = besseli(alpha, zpr)
+            #else:
+            #    print(zpr)
+            #    iapr = 1 / (sqrt(2 * pi * zpr) * (1 + alpha**2 / zpr**2)**(1 / 4)) * exp(-alpha * arcsinh(alpha / zpr) + zpr * sqrt(1 + alpha**2 / zpr**2))
+            
+            polar_avg = exp(exponent) * sqrt(abs(cosq)) + (1 - cosq**2) * ia \
+                * exp(exppol - qperp**2 / (2 * eb) * (1 + texp) / (1 - texp))
+            polar_avg_blk = exp(2 * exponent) * sqrt(abs(cosq)) + (1 - cosq**2) * iapr \
+                * exp(2 * exppol - qperp**2 / (2 * eb) * (1 + texp**2) / (1 - texp**2))
+            blocking_pref = n * sinh(ebmt / 2) / cosh(GP * ebmt / 4) * 2 * pi**(3 / 2) / (eb * sqrt(MN * t))
+
+            spin_sum += mred_ncp(s, spr, cost, costpr, phi) * exp((GP - 2) * s * ebmt / 4) * (polar_avg \
+                - exp((GP - 2) * spr * ebmt / 4) * blocking_pref * polar_avg_blk)
+    return prefactor * spin_sum
+
+def synchp(eb, t, n, knu, cost, knupr, costpr, phi):
+    cos_kkpr = cost * costpr + sqrt((1 - cost**2) * (1 - costpr**2)) * cos(phi)
+    q = sqrt(knu**2 + knupr**2 + 2 * knu * knupr * cos_kkpr)
+    q0 = knupr + knu
+    ebmt = eb / (MN * t)
+    qz = knupr * costpr - knu * cost
+    cosq = qz / q
+    qperp = sqrt(q**2 - qz**2)
+    texp = exp(-ebmt)
+    z = qperp**2 * sqrt(texp) / (eb * (1 - texp))
+    zpr = qperp**2 * texp / (eb * (1 - texp**2))
+
+    prefactor = GF**2 * knupr**2 * knu**2 * n / (4 * (2 * pi)**(11 / 2) * cosh(GP * ebmt / 4)) * sqrt(MN / (t * qz**2))
     
     spin_sum = 0 
     for s in [-1, 1]:
