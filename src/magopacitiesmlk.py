@@ -258,10 +258,7 @@ def urcan(eb, t, mue, nb, yp, knu, cost, ui, corr_on = True):
             elec_kin = (1 - nfd(ee, mue, t)) * thetapm(knu, sp, sn, eb, ui, -1) * vt_cc(ee**2 / (2 * eb), sp, sn, cost)
             
             eepl = e0pm(knu, sp, sn, eb, ui, 1)
-            if sp == sn:
-                pos_kin = nfd(eepl, -mue, t) * (1 - thetapm(knu, sp, sn, eb, ui, 1)) * vt_cc(eepl**2 / (2 * eb), sp, sn, cost)
-            else:
-                pos_kin = nfd(eepl, -mue, t) * (1 - thetapm(knu, sp, sn, eb, ui, 1)) * vt_cc(eepl**2 / (2 * eb), -sp, -sn, cost)
+            pos_kin = nfd(eepl, -mue, t) * (1 - thetapm(knu, sp, sn, eb, ui, 1)) * vt_cc(eepl**2 / (2 * eb), sp, sn, cost)
 
             blocking = exp(GN * sn * ebmt / 4) * (1 - nb * yp * exp((GP - 2) * sp * ebmt / 4) / cosh(GP * ebmt / 4) 
                 * (pi / (MN * t))**(3 / 2) * (1 - exp(-ebmt)) / (ebmt + 1 - exp(-ebmt)) * cosh(kz * ee / (2 * MN * t))
@@ -308,10 +305,7 @@ def kappap(eb, t, mue, nb, yp, knu, cost, ui, corr_on = True):
     for sp in [-1, 1]:
         for sn in [-1, 1]:
             ee = e0pm(knu, sp, sn, eb, ui, -1)
-            if sp == sn:
-                elec_kin = (1 - nfd(ee, -mue, t)) * (1 - thetapm(knu, sp, sn, eb, ui, 1)) * vt_cc(ee**2 / (2 * eb), sp, sn, cost)
-            else:
-                elec_kin = (1 - nfd(ee, -mue, t)) * (1 - thetapm(knu, sp, sn, eb, ui, 1)) * vt_cc(ee**2 / (2 * eb), -sp, -sn, cost)
+            elec_kin = (1 - nfd(ee, -mue, t)) * (1 - thetapm(knu, sp, sn, eb, ui, 1)) * vt_cc(ee**2 / (2 * eb), sp, sn, cost)
             blocking = exp((GP - 2) * sp * ebmt / 4) * (1 - nb * (1 - yp) * exp(GN * sn * ebmt / 4) / cosh(GN * ebmt / 4) 
                 * (pi / (MN * t))**(3 / 2) * (1 - exp(-ebmt)) / (ebmt + 1 - exp(-ebmt)) * cosh(kz * ee / (2 * MN * t))
                 * exp(-kperp**2 / (2 * MN * t) * (1 - exp(-ebmt)) / (ebmt + 1 - exp(-ebmt)) - (kz**2 + ee**2) / (4 * MN * t)))
