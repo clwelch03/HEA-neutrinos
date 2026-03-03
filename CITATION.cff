@@ -1,0 +1,27 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: >-
+  HEA-neutrinos
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Mia
+    family-names: Kumamoto
+    email: mkumamoto@berkeley.edu
+    affiliation: UC Berkeley
+    orcid: 'https://orcid.org/0009-0004-9515-9213'
+  - given-names: Catherine
+    family-names: Welch
+    email: clwelch@berkeley.edu
+    affiliation: UC Berkeley
+    orcid: 'https://orcid.org/0000-0002-1738-0463'
+identifiers:
+  - type: url
+    value: 'https://arxiv.org/abs/2601.18051'
+    description: arxiv url
+repository-code: 'https://github.com/clwelch03/HEA-neutrinos'
+license: BSD 3-Clause

@@ -283,7 +283,7 @@ def kappan_degen(eb, t, mue, mun, nb, yp, knu, cost, ui, corr_on = True):
             ee = e0pm(knu, sp, sn, eb, ui, 1)
             bb = bigb(sqrt(mun / t + GN * sn * ebmt / 4), (1 - exp(-ebmt) / ebmt), exp(GN * sn * ebmt / 8) / cosh(GN * ebmt / 8), eb, t, knu, cost)
             elec_kin = (1 - nfd(ee, mue, t)) * thetapm(-knu, sp, sn, eb, ui, -1) * vt_cc(ee**2 / (2 * eb), sp, sn, cost)
-            blocking = 1 - yp / (1 - yp) * (1 - exp(-ebmt)) * exp((GP - 2) * sp * ebmt / 4) / cosh(GP * ebmt / 4) * bigb
+            blocking = 1 - yp / (1 - yp) * (1 - exp(-ebmt)) * exp((GP - 2) * sp * ebmt / 4) / cosh(GP * ebmt / 4) * bb
             spin_sum += elec_kin * blocking
     return prefactor * spin_sum * corr
 
@@ -354,7 +354,7 @@ def kappap_degen(eb, t, mue, mun, nb, yp, knu, cost, ui, corr_on = True):
             ee = e0pm(knu, sp, sn, eb, ui, -1)
             bb = bigb(sqrt(mun / t + GN * sn * ebmt / 4), (1 - exp(-ebmt) / ebmt), exp(GN * sn * ebmt / 8) / cosh(GN * ebmt / 8), eb, t, knu, cost)
             elec_kin = (1 - nfd(ee, -mue, t)) * (1 - thetapm(knu, sp, sn, eb, ui, 1)) * vt_cc(ee**2 / (2 * eb), sp, sn, cost)
-            blocking = 1 - (1 - yp) / yp * (1 - exp(-ebmt)) * bigb
+            blocking = 1 - (1 - yp) / yp * (1 - exp(-ebmt)) * bb
             spin_sum += elec_kin * blocking
     return prefactor * spin_sum * corr
 
