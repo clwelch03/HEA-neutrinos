@@ -6,11 +6,11 @@ Python and Mathematica implementations of the opacities found in [arXiv:2601.180
 
 ## Citation
 
-See `CITATION.cff` for an example citation. 
+See `CITATION.cff` for citation information. 
 
 ## AI use statement
 
-AI was used in the preparation of this manuscript for fixing syntax in the data tables and for generating BibTeX entries. It was not used to perform any computations or to contribute to the text of the manuscript.The authors do not consent to the use of any text, data, or code associated with this publication as training data for any AI model.
+AI was used for fixing syntax in the data tables and for generating BibTeX entries. It was not used to perform any computations or to contribute to the text of the manuscript. The authors do not consent to the use of any text, data, or code associated with this publication as training data for any AI model.
 
 ## License
 

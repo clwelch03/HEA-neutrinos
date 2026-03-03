@@ -63,6 +63,21 @@ def n_of_mue_no_pos(mue, eb, t):
 def mue_of_n_no_pos(n, eb, t, guess = 0):
     return fsolve(lambda mue: n_of_mue_no_pos(mue, eb, t) - n, guess)[0]
 
+def n_of_mun(mun, eb, t):
+    if not type(mue) == float:
+        mue = mue[0]
+    if mun > 0:
+        maxk = sqrt(2 * NUCLEON_MASS * (mun + 10 * t))
+    else:
+        maxk = sqrt(2 * NUCLEON_MASS * 10 * t)
+    ebmt = eb / (NUCLEON_MASS * t)
+    integral = quad(lambda k: (nfd(np.sqrt(k**2 + NUCLEON_MASS**2) + GN * ebmt / 4, mun, t)
+        + nfd(np.sqrt(k**2 + NUCLEON_MASS**2) + GN * ebmt / 4, mun, t) - GN * ebmt / 4) * k**2, 0, maxk)[0]
+    return integral / (2 * pi**2)
+
+def mun_of_n(n, eb, t, guess = 0):
+    return fsolve(lambda mun: n_of_mun(mun, eb, t) - n, guess)[0]
+
 #lepton kinematics
 def thetapm(x, sp, sn, eb, ui, pm):
     if MSPLIT + pm * ELECTRON_MASS + ui - eb / (4 * MN) * (GN * sn - (GP - 2) * sp) - x > 0:
