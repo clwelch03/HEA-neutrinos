@@ -63,19 +63,34 @@ def n_of_mue_no_pos(mue, eb, t):
 def mue_of_n_no_pos(n, eb, t, guess = 0):
     return fsolve(lambda mue: n_of_mue_no_pos(mue, eb, t) - n, guess)[0]
 
-def n_of_mun(mun, eb, t):
-    if not type(mue) == float:
-        mue = mue[0]
-    if mun > 0:
-        maxk = sqrt(2 * NUCLEON_MASS * (mun + 10 * t))
+def n_of_mup(mup, eb, t):
+    if not type(mup) == float or type(mup) == int:
+        mup = mup[0]
+    if mup > 0:
+        maxk = sqrt(2 * MN * (mup + 10 * t))
     else:
-        maxk = sqrt(2 * NUCLEON_MASS * 10 * t)
-    ebmt = eb / (NUCLEON_MASS * t)
-    integral = quad(lambda k: (nfd(np.sqrt(k**2 + NUCLEON_MASS**2) + GN * ebmt / 4, mun, t)
-        + nfd(np.sqrt(k**2 + NUCLEON_MASS**2) + GN * ebmt / 4, mun, t) - GN * ebmt / 4) * k**2, 0, maxk)[0]
+        maxk = sqrt(2 * MN * 10 * t)
+        
+    nmax = int(ceil(maxk**2 / eb))
+    n = quad(lambda kz: nfd(np.sqrt(kz**2 + MN**2 - (GP - 2) * eb / 2) - MN, mup, t), -maxk, maxk)[0]
+    for ll in range(1, nmax + 1):
+        n += quad(lambda kz: nfd(np.sqrt(kz**2 + 2 * ll * eb + MN**2 - (GP - 2) * eb / 2) - MN, mup, t)
+            + nfd(np.sqrt(kz**2 + 2 * ll * eb + MN**2 + (GP - 2) * eb / 2) - MN, mup, t), -maxk, maxk)[0]
+    return n * eb / (4 * pi**2)
+
+def n_of_mun(mun, eb, t):
+    if not type(mun) == float:
+        mun = mun[0]
+    if mun > 0:
+        maxk = sqrt(2 * MN * (mun + 10 * t))
+    else:
+        maxk = sqrt(2 * MN * 10 * t)
+    ebmt = eb / (MN * t)
+    integral = quad(lambda k: (nfd(np.sqrt(k**2 + MN**2) - MN + GN * ebmt / 4, mun, t)
+        + nfd(np.sqrt(k**2 + MN**2) - MN + GN * ebmt / 4, mun, t) - GN * ebmt / 4) * k**2, 0, maxk)[0]
     return integral / (2 * pi**2)
 
-def mun_of_n(n, eb, t, guess = 0):
+def mun_of_n(n, eb, t, guess = 0.1):
     return fsolve(lambda mun: n_of_mun(mun, eb, t) - n, guess)[0]
 
 #lepton kinematics
@@ -93,7 +108,6 @@ def e0pm(knu, sp, sn, eb, ui, pm):
         return 0
 
 #for pauli blocking in degenerate CC
-def ufunc(eb, t): return MN * t / eb * (1 - exp(-eb / (MN * t)))
 def f1(k0, u): return sqrt(pi) / (2 * u * sqrt(1 - u)) * (sqrt( 1 - u) * erf(k0)
     - exp(-k0**2 * u) * erf(k0 * sqrt(1 - u)))
 def f2(k0, u): return 1 / (4 * u**2 * sqrt(1 - u)) * (sqrt(pi) * sqrt(1- u) * (2 + u) * erf(k0)
@@ -108,10 +122,9 @@ def g2(k0, u): return pi**2 * exp(-k0**2) / (12 * sqrt(1 - u)) * (k0 * sqrt(1 - 
 def g3(k0, u): return pi**2 * exp(-k0**2) / (24 * (1 - u)**(3 / 2)) * (2 * k0 * sqrt(1 - u)
     - exp(-k0**2 * (u - 1)) * u * sqrt(pi) * erf(k0 * sqrt(1 - u)))
 
-def bigb(kfn, u, w, eb, t, knu, cost):
-    kfnt = kfn / sqrt(2 * MN * t)
+def bigb(kfnt, u, w, eb, t, knu, cost):
     knut = knu / sqrt(2 * MN * t)
-    return 2 * MN * t / (eb * sqrt(pi)) * exp(eb / (2 * MN * t)) * (f1(kfnt, u) + w * g1(kfnt, u) 
+    return 4 / sqrt(pi) * (1 - exp(-eb / (MN * t))) * MN * t / eb * (f1(kfnt, u) + w * g1(kfnt, u) 
         + knut**2 * ((f1(kfnt, u) + w * g1(kfnt, u)) * (u + cost**2 - u * cost**2)
         + (f2(kfnt, u) + w * g2(kfnt, u)) * u**2 * (cost**2 - 1)
         + (f3(kfnt, u) + w * g3(kfnt, u)) * (u**2 + 2 * cost**2 + u**2 * cost**2)))
@@ -283,7 +296,7 @@ def urcan(eb, t, mue, nb, yp, knu, cost, ui, corr_on = True):
 
 def kappan_degen(eb, t, mue, mun, nb, yp, knu, cost, ui, corr_on = True):
     ebmt = eb / (MN * t)
-    prefactor = GF**2 * COSTC**2 * nb * (1 - yp) * eb / pi 
+    prefactor = GF**2 * COSTC**2 * nb * (1 - yp) * eb / pi
     #isospin chemical potential
     muhat = t * log(nb * yp * sinh(ebmt / 2) * (2 * pi / (MN * t))**(3 / 2) / (ebmt * cosh(GP * ebmt / 4))) - mun
     #weak magnetism and stim absorption
@@ -296,9 +309,12 @@ def kappan_degen(eb, t, mue, mun, nb, yp, knu, cost, ui, corr_on = True):
     for sp in [-1, 1]:
         for sn in [-1, 1]:
             ee = e0pm(knu, sp, sn, eb, ui, 1)
-            bb = bigb(sqrt(mun / t + GN * sn * ebmt / 4), (1 - exp(-ebmt) / ebmt), exp(GN * sn * ebmt / 8) / cosh(GN * ebmt / 8), eb, t, knu, cost)
+            if 2 * MN * mun + GN * sn * eb / 2 > 0:
+                bb = bigb(sqrt((2 * MN * mun + GN * sn * eb / 2) / (2 * MN * t)), (1 - exp(-ebmt)) / ebmt, exp(GN * sn * ebmt / 8) / cosh(GN * ebmt / 8), eb, t, knu, cost)
+            else:
+                bb = 0
             elec_kin = (1 - nfd(ee, mue, t)) * thetapm(-knu, sp, sn, eb, ui, -1) * vt_cc(ee**2 / (2 * eb), sp, sn, cost)
-            blocking = 1 - yp / (1 - yp) * (1 - exp(-ebmt)) * exp((GP - 2) * sp * ebmt / 4) / cosh(GP * ebmt / 4) * bb
+            blocking = 1 - yp / (1 - yp) * exp(ebmt / 2) * exp((GP - 2) * sp * ebmt / 4) / cosh(GP * ebmt / 4) * bb
             spin_sum += elec_kin * blocking
     return prefactor * spin_sum * corr
 
@@ -354,7 +370,7 @@ def urcap(eb, t, mue, nb, yp, knu, cost, ui, corr_on = True):
 
 def kappap_degen(eb, t, mue, mun, nb, yp, knu, cost, ui, corr_on = True):
     ebmt = eb / (MN * t)
-    prefactor = GF**2 * COSTC**2 * nb * yp * eb / pi 
+    prefactor = GF**2 * COSTC**2 * nb * yp * eb * exp(ebmt / 2) / (pi * cosh(GP * ebmt / 4)) 
     #isospin chemical potential
     muhat = t * log(nb * yp * sinh(ebmt / 2) * (2 * pi / (MN * t))**(3 / 2) / (ebmt * cosh(GP * ebmt / 4))) - mun
     #weak magnetism and stim absorption
@@ -367,9 +383,17 @@ def kappap_degen(eb, t, mue, mun, nb, yp, knu, cost, ui, corr_on = True):
     for sp in [-1, 1]:
         for sn in [-1, 1]:
             ee = e0pm(knu, sp, sn, eb, ui, -1)
-            bb = bigb(sqrt(mun / t + GN * sn * ebmt / 4), (1 - exp(-ebmt) / ebmt), exp(GN * sn * ebmt / 8) / cosh(GN * ebmt / 8), eb, t, knu, cost)
-            elec_kin = (1 - nfd(ee, -mue, t)) * (1 - thetapm(knu, sp, sn, eb, ui, 1)) * vt_cc(ee**2 / (2 * eb), sp, sn, cost)
-            blocking = 1 - (1 - yp) / yp * (1 - exp(-ebmt)) * bb
+            if 2 * MN * mun + GN * sn * eb / 2 > 0:
+                bb = bigb(sqrt((2 * MN * mun + GN * sn * eb / 2) / (2 * MN * t)), (1 - exp(-ebmt)) / ebmt, exp(GN * sn * ebmt / 8) / cosh(GN * ebmt / 8), eb, t, knu, cost)
+            else:
+                bb = 0
+            elec_kin = (1 - nfd(ee, -mue, t)) * (1 - thetapm(knu, sp, sn, eb, ui, 1)) * vt_cc(ee**2 / (2 * eb), sp, sn, cost) * exp((GP - 2) * sp * ebmt / 4)
+            if 0 < bb < 1:
+                blocking = 1 - bb
+            elif bb > 1:
+                blocking = 0
+            else:
+                blocking = 1
             spin_sum += elec_kin * blocking
     return prefactor * spin_sum * corr
 
