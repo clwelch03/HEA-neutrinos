@@ -41,8 +41,21 @@ def n_of_mue(mue, eb, t):
             - 2 * nfd(np.sqrt(kz**2 + 2 * ne * eb + ELECTRON_MASS**2), -mue, t), -maxk, maxk)[0]
     return n * eb / (4 * pi**2)
 
+def n_of_mue_zero(mue, t):
+    if not type(mue) == float:
+        mue = mue[0]
+    if mue > 0:
+        maxk = mue + 10 * t
+    else:
+        maxk = 10 * t
+    n = quad(lambda k: k**2 / pi**2 * nfd(np.sqrt(k**2 + ELECTRON_MASS**2), mue, t) - nfd(np.sqrt(k**2 + ELECTRON_MASS**2), -mue, t), 0, maxk)[0]
+    return n
+
 def mue_of_n(n, eb, t, guess = 0):
     return fsolve(lambda mue: n_of_mue(mue, eb, t) - n, guess)[0]
+
+def mue_of_n_zero(n, t, guess = 0):
+    return fsolve(lambda mue: n_of_mue_zero(mue, t) - n, guess)[0]
 
 def n_of_mue_no_pos(mue, eb, t):
     if not type(mue) == float:
@@ -184,6 +197,17 @@ def mred_ncp_int(s, spr, cost):
     else:
         return GA**2
 
+#integrate over outgoing neutrino angles with exp(-q^2/4MT)
+def mred_ncp_intexp(s, spr, cost, knu, t):
+    u = knu**2 / (2 * MN * t)
+    iu = 1 / tanh(u) - 1 / u
+    prefactor = 1 / (4 * u) * ( 1 - exp(-u))
+    if s == spr:
+        return prefactor * ((1 - iu) * (1 - 4 * SINTW**2)**2 + GA**2 * (1 + iu * (2 * cost**2 - 1))
+            - 2 * (1 - 4 * SINTW**2) * GA * s * cost * (1 + iu))
+    else:
+        return prefactor * GA**2 * (2 - 2 * cost * iu)
+
 #neutrons
 def mred_ncn(s, spr, cost, costpr, phi):
     sint = sqrt(1 - cost**2)
@@ -208,7 +232,7 @@ def mred_ncn_intexp(s, spr, cost, knu, t):
     iu = 1 / tanh(u) - 1 / u
     prefactor = 1 / (4 * u) * ( 1 - exp(-u))
     if s == spr:
-        return prefactor * (1 - iu + GA**2 + (1 + iu * (2 * cost**2 - 1))
+        return prefactor * (1 - iu + GA**2 * (1 + iu * (2 * cost**2 - 1))
             - 2 * GA * s * cost * (1 + iu))
     else:
         return prefactor * GA**2 * (2 - 2 * cost * iu)
@@ -265,6 +289,25 @@ def kappan(eb, t, mue, nb, yp, knu, cost, ui, corr_on = True):
             blocking = exp(GN * sn * ebmt / 4) * (1 - nb * yp * exp((GP - 2) * sp * ebmt / 4) / cosh(GP * ebmt / 4) 
                 * (pi / (MN * t))**(3 / 2) * (1 - exp(-ebmt)) / (ebmt + 1 - exp(-ebmt)) * cosh(kz * ee / (2 * MN * t))
                 * exp(-kperp**2 / (2 * MN * t) * (1 - exp(-ebmt)) / (ebmt + 1 - exp(-ebmt)) - (kz**2 + ee**2) / (4 * MN * t)))
+            spin_sum += elec_kin * blocking
+    return prefactor * spin_sum * corr
+
+def kappan_zero(t, mue, nb, yp, knu, cost, ui, corr_on = True):
+    prefactor = GF**2 * COSTC**2 * nb * (1 - yp) / pi
+    #isospin chemical potential
+    muhat = t * log(yp / (1 - yp))
+    #this has weak magnetism and stimulated absorption
+    if corr_on:
+        corr = (1 + 1.1 * knu / MN) / (1 - nfd(knu, mue + muhat, t))
+    else:
+        corr = 1
+
+    spin_sum = 0
+    for sp in [-1, 1]:
+        for sn in [-1, 1]:
+            ee = e0pm(knu, 0, 0, 0, ui, 1)
+            elec_kin = (1 - nfd(ee, mue, t)) * thetapm(-knu, 0, 0, 0, ui, -1) * ee**2 * mred_cc(sp, sn, False, cost)
+            blocking = (1 - nb * yp * (pi / (MN * t))**(3 / 2) / 2 * cosh(knu * ee / (2 * MN * t)) * exp(-knu**2 / (4 * MN * t)))
             spin_sum += elec_kin * blocking
     return prefactor * spin_sum * corr
 
@@ -340,6 +383,27 @@ def kappap(eb, t, mue, nb, yp, knu, cost, ui, corr_on = True):
             blocking = exp((GP - 2) * sp * ebmt / 4) * (1 - nb * (1 - yp) * exp(GN * sn * ebmt / 4) / cosh(GN * ebmt / 4) 
                 * (pi / (MN * t))**(3 / 2) * (1 - exp(-ebmt)) / (ebmt + 1 - exp(-ebmt)) * cosh(kz * ee / (2 * MN * t))
                 * exp(-kperp**2 / (2 * MN * t) * (1 - exp(-ebmt)) / (ebmt + 1 - exp(-ebmt)) - (kz**2 + ee**2) / (4 * MN * t)))
+            spin_sum += elec_kin * blocking
+    return prefactor * spin_sum * corr
+
+def kappap_zero(t, mue, nb, yp, knu, cost, ui, corr_on = True):
+    kz = knu * cost
+    kperp = knu * sqrt(1 - cost**2)
+    prefactor = GF**2 * COSTC**2 * nb * yp / pi
+    #isospin chemical potential
+    muhat = t * log(yp / (1 - yp))
+    #this has weak magnetism and stimulated absorption
+    if corr_on:
+        corr = (1 - 7.1 * knu / MN) / (1 - nfd(knu, -mue - muhat, t))
+    else:
+        corr = 1
+
+    spin_sum = 0
+    for sp in [-1, 1]:
+        for sn in [-1, 1]:
+            ee = e0pm(knu, 0, 0, 0, ui, -1)
+            elec_kin = (1 - nfd(ee, -mue, t)) * (1 - thetapm(knu, 0, 0, 0, ui, 1)) * ee**2 * mred_cc(sp, sn, False, cost)
+            blocking = (1 - nb * (1 - yp) * (pi / (MN * t))**(3 / 2) / 2 * cosh(knu * ee / (2 * MN * t)) * exp(-(knu**2 + ee**2) / (4 * MN * t)))
             spin_sum += elec_kin * blocking
     return prefactor * spin_sum * corr
 
@@ -448,6 +512,16 @@ def kappan_nc(eb, t, n, knu, cost):
             factor = (knu + delta_sspr(eb, GN, s, spr))**2 * exp(GN * s * ebmt / 4)
             blocking = mred_ncn_int(s, spr, cost) - n * exp(GN * spr * ebmt / 4) / cosh(GN * ebmt / 4) \
                 * (pi / (MN * t))**(3 / 2) * mred_ncn_intexp(s, spr, cost, knu, t)
+            spin_sum += factor * blocking
+    return prefactor * spin_sum
+
+def kappan_nc_zero(t, n, knu, cost):
+    prefactor = GF**2 * n / (4 * pi)
+    spin_sum = 0
+    for s in [-1, 1]:
+        for spr in [-1, 1]:
+            factor = knu**2
+            blocking = mred_ncn_int(s, spr, cost) - n * (pi / (MN * t))**(3 / 2) * mred_ncn_intexp(s, spr, cost, knu, t)
             spin_sum += factor * blocking
     return prefactor * spin_sum
 
@@ -577,10 +651,20 @@ def kappap_nc(eb, t, n, knu, cost):
         for spr in [-1, 1]:
             dss = delta_sspr(eb, GP - 2, s, spr)
             if knu + dss > 0:
-                sum_pref = mred_ncp_int(s, spr, cost) * (knu + dss)**2 * exp((GP - 2) * ebmt / 4)
-                blocking = 1 - n * sinh(ebmt / 2) / cosh(GP * ebmt / 4) * (2 * pi)**(3 / 2) / (eb * sqrt(MN * t)) \
+                sum_pref = (knu + dss)**2 * exp((GP - 2) * ebmt / 4)
+                blocking = mred_ncp_int(s, spr, cost)  - mred_ncp_intexp(s, spr, cost, knu, t) * n * sinh(ebmt / 2) / cosh(GP * ebmt / 4) * (2 * pi)**(3 / 2) / (eb * sqrt(MN * t)) \
                     * exp((GP - 2) * spr * ebmt / 4)
                 spin_sum += sum_pref * blocking
+    return prefactor * spin_sum
+
+def kappap_nc_zero(t, n, knu, cost):
+    prefactor = GF**2 * n / (4 * pi)
+    spin_sum = 0
+    for s in [-1, 1]:
+        for spr in [-1, 1]:
+            factor = knu**2
+            blocking = mred_ncp_int(s, spr, cost) - n * (pi / (MN * t))**(3 / 2) * mred_ncp_intexp(s, spr, cost, knu, t)
+            spin_sum += factor * blocking
     return prefactor * spin_sum
 
 #functions for electron integrals
