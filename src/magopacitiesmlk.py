@@ -2,6 +2,7 @@ from math import sqrt, exp, log, log10, erf, cos, tanh, sinh, cosh, pi, floor, c
 from numpy import arcsinh
 from scipy.optimize import fsolve
 from scipy.integrate import quad
+from scipy.special import roots_legendre
 from scipy.special import iv as besseli
 import numpy as np
 
@@ -23,6 +24,26 @@ GN = -3.8263
 COSTC = sqrt(0.95)
 GF = (HBARC / 292800)**2
 
+#gauss legendre with no subdivisions
+def gauss_legendre(func, a, b, vectorizable = True, n = 300):
+    # get points and weights
+    x, w = roots_legendre(n)
+    x = (x + 1) / 2 * (b - a) + a
+    w = w * (b - a) / 2
+
+    # reweight the function
+    if vectorizable:
+        test = func(x[0])
+        if not type(test) == np.ndarray:
+            return np.sum(w * func(x))
+        else:
+            arr_size = len(test.shape)
+            x_fix = x.reshape([1] * arr_size + [n])
+            w_fix = w.reshape([1] * arr_size + [n])
+            return np.sum(w_fix * func(x_fix), axis = arr_size)
+    else:
+        return(np.sum(np.array([w[ix] * func(x_temp) for ix, x_temp in enumerate(x)]), axis = 0))
+
 ##helper functions
 #functions for chemical potentials
 def nfd(e, mu, t): return 1 / (np.exp((e - mu) / t) + 1)
@@ -35,10 +56,10 @@ def n_of_mue(mue, eb, t):
     else:
         maxk = 10 * t
     nmax = int(ceil(maxk**2 / eb))
-    n = quad(lambda kz: nfd(np.sqrt(kz**2 + ELECTRON_MASS**2), mue, t) - nfd(np.sqrt(kz**2 + ELECTRON_MASS**2), -mue, t), -maxk, maxk)[0]
+    n = 2 * gauss_legendre(lambda kz: nfd(np.sqrt(kz**2 + ELECTRON_MASS**2), mue, t) - nfd(np.sqrt(kz**2 + ELECTRON_MASS**2), -mue, t), 0, maxk)
     for ne in range(1, nmax + 1):
-        n += quad(lambda kz: 2 * nfd(np.sqrt(kz**2 + 2 * ne * eb + ELECTRON_MASS**2), mue, t)
-            - 2 * nfd(np.sqrt(kz**2 + 2 * ne * eb + ELECTRON_MASS**2), -mue, t), -maxk, maxk)[0]
+        n += 2 * gauss_legendre(lambda kz: 2 * nfd(np.sqrt(kz**2 + 2 * ne * eb + ELECTRON_MASS**2), mue, t)
+            - 2 * nfd(np.sqrt(kz**2 + 2 * ne * eb + ELECTRON_MASS**2), -mue, t), 0, maxk)
     return n * eb / (4 * pi**2)
 
 def n_of_mue_zero(mue, t):
@@ -48,7 +69,7 @@ def n_of_mue_zero(mue, t):
         maxk = mue + 10 * t
     else:
         maxk = 10 * t
-    n = quad(lambda k: k**2 / pi**2 * nfd(np.sqrt(k**2 + ELECTRON_MASS**2), mue, t) - nfd(np.sqrt(k**2 + ELECTRON_MASS**2), -mue, t), 0, maxk)[0]
+    n = gauss_legendre(lambda k: k**2 / pi**2 * (nfd(np.sqrt(k**2 + ELECTRON_MASS**2), mue, t) - nfd(np.sqrt(k**2 + ELECTRON_MASS**2), -mue, t)), 0, maxk)
     return n
 
 def mue_of_n(n, eb, t, guess = 0):
