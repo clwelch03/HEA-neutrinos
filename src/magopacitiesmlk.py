@@ -191,13 +191,22 @@ def mred_cc(sp, sn, nezero, cost):
             case (-1, -1):
                 return 1 / 4 * ((1 + GA)**2 * (1 - cost) + (1 - GA)**2 * (1 + cost))
 
-def vt_cc(x, sp, sn, cost):
+def vt_cc(x, y, sp, sn, cost):
     if x < 0:
         return 0
     elif x < 1 / 2:
         return mred_cc(sp, sn, True, cost)
+    elif x < 1 / sqrt(y):
+        return mred_cc(sp, sn, True, cost) + partial_sum(x, y) * mred_cc(sp, sn, False, cost)
     else:
         return mred_cc(sp, sn, True, cost) + (2 * x - 1) * mred_cc(sp, sn, False, cost)
+
+def partial_sum(x, y):
+    max_ix = int(np.floor(x * (1 - y)**2))
+    if max_ix == 0:
+        return 0
+    indices = np.linspace(1, max_ix, max_ix)
+    return np.sum(np.sqrt(x * (1 + y)**2 - indices) - np.sqrt(x * (1 - y)**2 - indices)) / (2 * y * sqrt(x))
 
 ##neutral current matrix elements
 #protons
@@ -289,13 +298,22 @@ def mred_nce_helweights(h, hpr, isx):
 ## below here are all of the analytical approximations for opacities
 
 #charged current nu + n -> e + p
-def kappan(eb, t, mue, nb, yp, knu, cost, ui, corr_on = True):
+def kappan(eb, t, mue, nb, yp, knu, cost, ui_init = 0, corr_on = True, mu_given = None, vi_given = None):
     kz = knu * cost
     kperp = knu * sqrt(1 - cost**2)
     ebmt = eb / (MN * t)
     prefactor = GF**2 * COSTC**2 * nb * (1 - yp) * eb / (pi * cosh(GN * ebmt / 4))
     #isospin chemical potential
-    muhat = t * log(yp / (1 - yp) * (2 * cosh(GN * ebmt / 4) * sinh(ebmt / 2) / (ebmt * cosh(GP * ebmt / 4))))
+    if mu_given is None:
+        muhat = t * log(nb * yp * sinh(ebmt / 2) * (2 * pi / (MN * t))**(3 / 2) / (ebmt * cosh(GP * ebmt / 4))) - mun
+    else:
+        mup, mun = mu_given
+        muhat = mup - mun
+    #vi_given assumes a mean field potential of the form VI = (psibar tau / 2 psi)^2
+    if vi_given is None:
+        ui = ui_init
+    else:
+        ui = (1 - 2 * yp) / 2 * vi_given * nb
     #this has weak magnetism and stimulated absorption
     if corr_on:
         corr = (1 + 1.1 * knu / MN) / (1 - nfd(knu, mue + muhat, t))
@@ -306,17 +324,26 @@ def kappan(eb, t, mue, nb, yp, knu, cost, ui, corr_on = True):
     for sp in [-1, 1]:
         for sn in [-1, 1]:
             ee = e0pm(knu, sp, sn, eb, ui, 1)
-            elec_kin = (1 - nfd(ee, mue, t)) * thetapm(-knu, sp, sn, eb, ui, -1) * vt_cc(ee**2 / (2 * eb), sp, sn, cost)
+            elec_kin = (1 - nfd(ee, mue, t)) * thetapm(-knu, sp, sn, eb, ui, -1) * vt_cc(ee**2 / (2 * eb), sqrt(t / MN), sp, sn, cost)
             blocking = exp(GN * sn * ebmt / 4) * (1 - nb * yp * exp((GP - 2) * sp * ebmt / 4) / cosh(GP * ebmt / 4) 
                 * (pi / (MN * t))**(3 / 2) * (1 - exp(-ebmt)) / (ebmt + 1 - exp(-ebmt)) * cosh(kz * ee / (2 * MN * t))
                 * exp(-kperp**2 / (2 * MN * t) * (1 - exp(-ebmt)) / (ebmt + 1 - exp(-ebmt)) - (kz**2 + ee**2) / (4 * MN * t)))
             spin_sum += elec_kin * blocking
     return prefactor * spin_sum * corr
 
-def kappan_zero(t, mue, nb, yp, knu, cost, ui, corr_on = True):
+def kappan_zero(t, mue, nb, yp, knu, cost, ui_init = 0, corr_on = True, mu_given = None, vi_given = None):
     prefactor = GF**2 * COSTC**2 * nb * (1 - yp) / pi
     #isospin chemical potential
-    muhat = t * log(yp / (1 - yp))
+    if mu_given is None:
+        muhat = t * log(yp / (1 - yp))
+    else:
+        mup, mun = mu_given
+        muhat = mup - mun
+    #vi_given assumes a mean field potential of the form VI = (psibar tau / 2 psi)^2
+    if vi_given is None:
+        ui = ui_init
+    else:
+        ui = (1 - 2 * yp) / 2 * vi_given * nb
     #this has weak magnetism and stimulated absorption
     if corr_on:
         corr = (1 + 1.1 * knu / MN) / (1 - nfd(knu, mue + muhat, t))
@@ -332,11 +359,16 @@ def kappan_zero(t, mue, nb, yp, knu, cost, ui, corr_on = True):
             spin_sum += elec_kin * blocking
     return prefactor * spin_sum * corr
 
-def urcan(eb, t, mue, nb, yp, knu, cost, ui, corr_on = True):
+def urcan(eb, t, mue, nb, yp, knu, cost, ui_init = 0, corr_on = True, vi_given = None):
     kz = knu * cost
     kperp = knu * sqrt(1 - cost**2)
     ebmt = eb / (MN * t)
     prefactor = GF**2 * COSTC**2 * nb * knu**2 * (1 - yp) * eb / (8 * pi**4 * cosh(GN * ebmt / 4))
+    #vi_given assumes a mean field potential of the form VI = (psibar tau / 2 psi)^2
+    if vi_given is None:
+        ui = ui_init
+    else:
+        ui = (1 - 2 * yp) / 2 * vi_given * nb
     #this has weak magnetism
     if corr_on:
         corr = (1 - 7.1 * knu / MN)
@@ -347,10 +379,10 @@ def urcan(eb, t, mue, nb, yp, knu, cost, ui, corr_on = True):
     for sp in [-1, 1]:
         for sn in [-1, 1]:
             ee = e0pm(knu, sp, sn, eb, ui, -1)
-            elec_kin = (1 - nfd(ee, mue, t)) * thetapm(knu, sp, sn, eb, ui, -1) * vt_cc(ee**2 / (2 * eb), sp, sn, cost)
+            elec_kin = (1 - nfd(ee, mue, t)) * thetapm(knu, sp, sn, eb, ui, -1) * vt_cc(ee**2 / (2 * eb), sqrt(t / MN), sp, sn, cost)
             
             eepl = e0pm(knu, sp, sn, eb, ui, 1)
-            pos_kin = nfd(eepl, -mue, t) * (1 - thetapm(knu, sp, sn, eb, ui, 1)) * vt_cc(eepl**2 / (2 * eb), sp, sn, cost)
+            pos_kin = nfd(eepl, -mue, t) * (1 - thetapm(knu, sp, sn, eb, ui, 1)) * vt_cc(eepl**2 / (2 * eb), sqrt(t / MN), sp, sn, cost)
 
             blocking = exp(GN * sn * ebmt / 4) * (1 - nb * yp * exp((GP - 2) * sp * ebmt / 4) / cosh(GP * ebmt / 4) 
                 * (pi / (MN * t))**(3 / 2) * (1 - exp(-ebmt)) / (ebmt + 1 - exp(-ebmt)) * cosh(kz * ee / (2 * MN * t))
@@ -358,11 +390,20 @@ def urcan(eb, t, mue, nb, yp, knu, cost, ui, corr_on = True):
             spin_sum += (elec_kin + pos_kin) * blocking
     return prefactor * spin_sum * corr
 
-def kappan_degen(eb, t, mue, mun, nb, yp, knu, cost, ui, corr_on = True):
+def kappan_degen(eb, t, mue, mun, nb, yp, knu, cost, ui_init = 0, corr_on = True, mu_given = None, vi_given = None):
     ebmt = eb / (MN * t)
     prefactor = GF**2 * COSTC**2 * nb * (1 - yp) * eb / pi
     #isospin chemical potential
-    muhat = t * log(nb * yp * sinh(ebmt / 2) * (2 * pi / (MN * t))**(3 / 2) / (ebmt * cosh(GP * ebmt / 4))) - mun
+    if mu_given is None:
+        muhat = t * log(nb * yp * sinh(ebmt / 2) * (2 * pi / (MN * t))**(3 / 2) / (ebmt * cosh(GP * ebmt / 4))) - mun
+    else:
+        mup, mun = mu_given
+        muhat = mup - mun
+    #vi_given assumes a mean field potential of the form VI = (psibar tau / 2 psi)^2
+    if vi_given is None:
+        ui = ui_init
+    else:
+        ui = (1 - 2 * yp) / 2 * vi_given * nb
     #weak magnetism and stim absorption
     if corr_on:
         corr = (1 + 1.1 * knu / MN) / (1 - nfd(knu, mue + muhat, t))
@@ -377,19 +418,28 @@ def kappan_degen(eb, t, mue, mun, nb, yp, knu, cost, ui, corr_on = True):
                 bb = bigb(sqrt((2 * MN * mun + GN * sn * eb / 2) / (2 * MN * t)), (1 - exp(-ebmt)) / ebmt, exp(GN * sn * ebmt / 8) / cosh(GN * ebmt / 8), eb, t, knu, cost)
             else:
                 bb = 0
-            elec_kin = (1 - nfd(ee, mue, t)) * thetapm(-knu, sp, sn, eb, ui, -1) * vt_cc(ee**2 / (2 * eb), sp, sn, cost)
+            elec_kin = (1 - nfd(ee, mue, t)) * thetapm(-knu, sp, sn, eb, ui, -1) * vt_cc(ee**2 / (2 * eb), sqrt(t / MN), sp, sn, cost)
             blocking = 1 - yp / (1 - yp) * exp(ebmt / 2) * exp((GP - 2) * sp * ebmt / 4) / cosh(GP * ebmt / 4) * bb
             spin_sum += elec_kin * blocking
     return prefactor * spin_sum * corr
 
 #charged current nubar + p -> e+ + n
-def kappap(eb, t, mue, nb, yp, knu, cost, ui, corr_on = True):
+def kappap(eb, t, mue, nb, yp, knu, cost, ui_init = 0, corr_on = True, mu_given = None, vi_given = None):
     kz = knu * cost
     kperp = knu * sqrt(1 - cost**2)
     ebmt = eb / (MN * t)
     prefactor = GF**2 * COSTC**2 * nb * yp * eb * exp(ebmt / 2) / (pi * cosh(GP * ebmt / 4))
     #isospin chemical potential
-    muhat = t * log(yp / (1 - yp) * (2 * cosh(GN * ebmt / 4) * sinh(ebmt / 2) / (ebmt * cosh(GP * ebmt / 4))))
+    if mu_given is None:
+        muhat = t * log(nb * yp * sinh(ebmt / 2) * (2 * pi / (MN * t))**(3 / 2) / (ebmt * cosh(GP * ebmt / 4))) - mun
+    else:
+        mup, mun = mu_given
+        muhat = mup - mun
+    #vi_given assumes a mean field potential of the form VI = (psibar tau / 2 psi)^2
+    if vi_given is None:
+        ui = ui_init
+    else:
+        ui = (1 - 2 * yp) / 2 * vi_given * nb
     #this has weak magnetism and stimulated absorption
     if corr_on:
         corr = (1 - 7.1 * knu / MN) / (1 - nfd(knu, -mue - muhat, t))
@@ -400,19 +450,28 @@ def kappap(eb, t, mue, nb, yp, knu, cost, ui, corr_on = True):
     for sp in [-1, 1]:
         for sn in [-1, 1]:
             ee = e0pm(knu, sp, sn, eb, ui, -1)
-            elec_kin = (1 - nfd(ee, -mue, t)) * (1 - thetapm(knu, sp, sn, eb, ui, 1)) * vt_cc(ee**2 / (2 * eb), sp, sn, cost)
+            elec_kin = (1 - nfd(ee, -mue, t)) * (1 - thetapm(knu, sp, sn, eb, ui, 1)) * vt_cc(ee**2 / (2 * eb), sqrt(t / MN), sp, sn, cost)
             blocking = exp((GP - 2) * sp * ebmt / 4) * (1 - nb * (1 - yp) * exp(GN * sn * ebmt / 4) / cosh(GN * ebmt / 4) 
                 * (pi / (MN * t))**(3 / 2) * (1 - exp(-ebmt)) / (ebmt + 1 - exp(-ebmt)) * cosh(kz * ee / (2 * MN * t))
                 * exp(-kperp**2 / (2 * MN * t) * (1 - exp(-ebmt)) / (ebmt + 1 - exp(-ebmt)) - (kz**2 + ee**2) / (4 * MN * t)))
             spin_sum += elec_kin * blocking
     return prefactor * spin_sum * corr
 
-def kappap_zero(t, mue, nb, yp, knu, cost, ui, corr_on = True):
+def kappap_zero(t, mue, nb, yp, knu, cost, ui_init = 0, corr_on = True, mu_given = None, vi_given = None):
     kz = knu * cost
     kperp = knu * sqrt(1 - cost**2)
     prefactor = GF**2 * COSTC**2 * nb * yp / pi
     #isospin chemical potential
-    muhat = t * log(yp / (1 - yp))
+    if mu_given is None:
+        muhat = t * log(yp / (1 - yp))
+    else:
+        mup, mun = mu_given
+        muhat = mup - mun
+    #vi_given assumes a mean field potential of the form VI = (psibar tau / 2 psi)^2
+    if vi_given is None:
+        ui = ui_init
+    else:
+        ui = (1 - 2 * yp) / 2 * vi_given * nb
     #this has weak magnetism and stimulated absorption
     if corr_on:
         corr = (1 - 7.1 * knu / MN) / (1 - nfd(knu, -mue - muhat, t))
@@ -428,10 +487,15 @@ def kappap_zero(t, mue, nb, yp, knu, cost, ui, corr_on = True):
             spin_sum += elec_kin * blocking
     return prefactor * spin_sum * corr
 
-def urcap(eb, t, mue, nb, yp, knu, cost, ui, corr_on = True):
+def urcap(eb, t, mue, nb, yp, knu, cost, ui_init = 0, corr_on = True, vi_given = None):
     kz = knu * cost
     kperp = knu * sqrt(1 - cost**2)
     ebmt = eb / (MN * t)
+    #vi_given assumes a mean field potential of the form VI = (psibar tau / 2 psi)^2
+    if vi_given is None:
+        ui = ui_init
+    else:
+        ui = (1 - 2 * yp) / 2 * vi_given * nb
     prefactor = GF**2 * COSTC**2 * knu**2 * nb * yp * eb * exp(ebmt / 2) / (8 * pi**4 * cosh(GP * ebmt / 4))
     #isospin chemical potential
     muhat = t * log(yp / (1 - yp) * (2 * cosh(GN * ebmt / 4) * sinh(ebmt / 2) / (ebmt * cosh(GP * ebmt / 4))))
@@ -445,7 +509,7 @@ def urcap(eb, t, mue, nb, yp, knu, cost, ui, corr_on = True):
     for sp in [-1, 1]:
         for sn in [-1, 1]:
             ee = e0pm(knu, sp, sn, eb, ui, 1)
-            elec_kin = nfd(ee, mue, t) * thetapm(-knu, sp, sn, eb, ui, -1) * vt_cc(ee**2 / (2 * eb), sp, sn, cost)
+            elec_kin = nfd(ee, mue, t) * thetapm(-knu, sp, sn, eb, ui, -1) * vt_cc(ee**2 / (2 * eb), sqrt(t / MN), sp, sn, cost)
 
             blocking = exp((GP - 2) * sp * ebmt / 4) * (1 - nb * (1 - yp) * exp(GN * sn * ebmt / 4) / cosh(GN * ebmt / 4) 
                 * (pi / (MN * t))**(3 / 2) * (1 - exp(-ebmt)) / (ebmt + 1 - exp(-ebmt)) * cosh(kz * ee / (2 * MN * t))
@@ -453,11 +517,20 @@ def urcap(eb, t, mue, nb, yp, knu, cost, ui, corr_on = True):
             spin_sum += elec_kin * blocking
     return prefactor * spin_sum * corr
 
-def kappap_degen(eb, t, mue, mun, nb, yp, knu, cost, ui, corr_on = True):
+def kappap_degen(eb, t, mue, mun, nb, yp, knu, cost, ui_init = 0, corr_on = True, mu_given = None, vi_given = None):
     ebmt = eb / (MN * t)
     prefactor = GF**2 * COSTC**2 * nb * yp * eb * exp(ebmt / 2) / (pi * cosh(GP * ebmt / 4)) 
     #isospin chemical potential
-    muhat = t * log(nb * yp * sinh(ebmt / 2) * (2 * pi / (MN * t))**(3 / 2) / (ebmt * cosh(GP * ebmt / 4))) - mun
+    if mu_given is None:
+        muhat = t * log(nb * yp * sinh(ebmt / 2) * (2 * pi / (MN * t))**(3 / 2) / (ebmt * cosh(GP * ebmt / 4))) - mun
+    else:
+        mup, mun = mu_given
+        muhat = mup - mun
+    #vi_given assumes a mean field potential of the form VI = (psibar tau / 2 psi)^2
+    if vi_given is None:
+        ui = ui_init
+    else:
+        ui = (1 - 2 * yp) / 2 * vi_given * nb
     #weak magnetism and stim absorption
     if corr_on:
         corr = (1 - 7.1 * knu / MN) / (1 - nfd(knu, -mue - muhat, t))
@@ -472,7 +545,7 @@ def kappap_degen(eb, t, mue, mun, nb, yp, knu, cost, ui, corr_on = True):
                 bb = bigb(sqrt((2 * MN * mun + GN * sn * eb / 2) / (2 * MN * t)), (1 - exp(-ebmt)) / ebmt, exp(GN * sn * ebmt / 8) / cosh(GN * ebmt / 8), eb, t, knu, cost)
             else:
                 bb = 0
-            elec_kin = (1 - nfd(ee, -mue, t)) * (1 - thetapm(knu, sp, sn, eb, ui, 1)) * vt_cc(ee**2 / (2 * eb), sp, sn, cost) * exp((GP - 2) * sp * ebmt / 4)
+            elec_kin = (1 - nfd(ee, -mue, t)) * (1 - thetapm(knu, sp, sn, eb, ui, 1)) * vt_cc(ee**2 / (2 * eb), sqrt(t / MN), sp, sn, cost) * exp((GP - 2) * sp * ebmt / 4)
             if 0 < bb < 1:
                 blocking = 1 - bb
             elif bb > 1:
