@@ -355,7 +355,7 @@ def kappan_zero(t, mue, nb, yp, knu, cost, ui_init = 0, corr_on = True, mu_given
         for sn in [-1, 1]:
             ee = e0pm(knu, 0, 0, 0, ui, 1)
             elec_kin = (1 - nfd(ee, mue, t)) * thetapm(-knu, 0, 0, 0, ui, -1) * ee**2 * mred_cc(sp, sn, False, cost)
-            blocking = (1 - nb * yp * (pi / (MN * t))**(3 / 2) / 2 * cosh(knu * ee / (2 * MN * t)) * exp(-knu**2 / (4 * MN * t)))
+            blocking = (1 - nb * yp * (pi / (MN * t))**(3 / 2) / 2 * cosh(knu * ee / (2 * MN * t)) * exp(-(knu**2 + ee**2) / (4 * MN * t)))
             spin_sum += elec_kin * blocking
     return prefactor * spin_sum * corr
 
